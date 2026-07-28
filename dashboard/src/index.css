@@ -1,0 +1,135 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #f0f4f0;
+  color: #1a2e1a;
+}
+
+.header {
+  background: #2d5a27;
+  color: white;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.header h1 { font-size: 1.4rem; font-weight: 600; }
+.header span { font-size: 1.8rem; }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+
+.selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.selector label { font-weight: 600; color: #2d5a27; }
+
+.selector select {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #aac9a0;
+  background: white;
+  font-size: 1rem;
+  color: #1a2e1a;
+  cursor: pointer;
+}
+
+.tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.tarjeta {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  border-left: 5px solid #2d5a27;
+}
+
+.tarjeta.cortos  { border-left-color: #f59e0b; }
+.tarjeta.medios  { border-left-color: #3b82f6; }
+.tarjeta.largos  { border-left-color: #10b981; }
+.tarjeta.total   { border-left-color: #2d5a27; }
+.tarjeta.etapa   { border-left-color: #8b5cf6; }
+
+.tarjeta .valor {
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.tarjeta .etiqueta {
+  font-size: 0.85rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.grafico-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  margin-bottom: 24px;
+}
+
+.grafico-card h2 {
+  font-size: 1rem;
+  color: #2d5a27;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.tabla th {
+  background: #f0f4f0;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #2d5a27;
+  border-bottom: 2px solid #aac9a0;
+}
+
+.tabla td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e8f0e8;
+}
+
+.tabla tr:hover td { background: #f8fbf8; }
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.badge.boton_cerrado  { background: #fef3c7; color: #92400e; }
+.badge.en_apertura    { background: #dbeafe; color: #1e40af; }
+.badge.flor_abierta   { background: #d1fae5; color: #065f46; }
+.badge.marchita       { background: #fee2e2; color: #991b1b; }
+.badge.sin_flor       { background: #f3f4f6; color: #374151; }
+.badge.error_analisis { background: #f3f4f6; color: #9ca3af; }
+
+.cargando {
+  text-align: center;
+  padding: 60px;
+  color: #666;
+  font-size: 1.1rem;
+}
