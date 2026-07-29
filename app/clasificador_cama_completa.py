@@ -212,7 +212,7 @@ def clasificar_un_lado(
 
     try:
         respuesta = client.messages.create(
-            model="claude-opus-4-6",
+            model="claude-3-5-sonnet-20241022",  # Modelo oficial de producción
             max_tokens=3000,
             messages=[{"role": "user", "content": contenido}]
         )

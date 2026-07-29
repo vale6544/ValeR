@@ -146,7 +146,7 @@ def clasificar_bloque(rutas_a: list, rutas_b: list, variedad: str = None) -> dic
     contenido.append({"type": "text", "text": _texto_json_bloque()})
 
     respuesta = client.messages.create(
-        model="claude-opus-4-6",
+        model="claude-3-5-sonnet-20241022",  # Modelo oficial de producción
         max_tokens=3000,
         messages=[{"role": "user", "content": contenido}]
     )

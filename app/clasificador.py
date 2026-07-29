@@ -272,7 +272,7 @@ def clasificar_tallos(ruta_imagen: str, lado: str = "A", filas: int = 1, varieda
     })
 
     respuesta = client.messages.create(
-        model="claude-opus-4-6",  # Modelo personalizado
+        model="claude-3-5-sonnet-20241022",  # Modelo oficial de producción
         max_tokens=2000,  # Aumentado a 2000 para dar espacio a la lista_tallos_detectados y evitar truncado
         messages=[{"role": "user", "content": contenido}]
     )
@@ -340,7 +340,7 @@ def clasificar_video_combinado(
     })
 
     respuesta = client.messages.create(
-        model="claude-opus-4-6",  # Modelo personalizado activo en el entorno del usuario
+        model="claude-3-5-sonnet-20241022",  # Modelo oficial de producción
         max_tokens=2000,  # Aumentado para dar espacio al control de solape CoT
         messages=[{"role": "user", "content": contenido}]
     )
