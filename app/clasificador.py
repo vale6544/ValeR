@@ -272,7 +272,7 @@ def clasificar_tallos(ruta_imagen: str, lado: str = "A", filas: int = 1, varieda
     })
 
     respuesta = client.messages.create(
-        model="claude-3-5-sonnet-20241022",  # Modelo oficial de producción
+        model="claude-3-5-sonnet-latest",  # Alias oficial dinámico de Claude 3.5 Sonnet
         max_tokens=2000,  # Aumentado a 2000 para dar espacio a la lista_tallos_detectados y evitar truncado
         messages=[{"role": "user", "content": contenido}]
     )
@@ -340,7 +340,7 @@ def clasificar_video_combinado(
     })
 
     respuesta = client.messages.create(
-        model="claude-3-5-sonnet-20241022",  # Modelo oficial de producción
+        model="claude-3-5-sonnet-latest",  # Alias oficial dinámico de Claude 3.5 Sonnet
         max_tokens=2000,  # Aumentado para dar espacio al control de solape CoT
         messages=[{"role": "user", "content": contenido}]
     )

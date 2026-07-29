@@ -212,7 +212,7 @@ def clasificar_un_lado(
 
     try:
         respuesta = client.messages.create(
-            model="claude-3-5-sonnet-20241022",  # Modelo oficial de producción
+            model="claude-3-5-sonnet-latest",  # Alias oficial dinámico de Claude 3.5 Sonnet
             max_tokens=3000,
             messages=[{"role": "user", "content": contenido}]
         )
