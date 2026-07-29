@@ -212,7 +212,7 @@ def clasificar_un_lado(
 
     try:
         respuesta = client.messages.create(
-            model="claude-3-5-sonnet-latest",  # Alias oficial dinámico de Claude 3.5 Sonnet
+            model="claude-3-haiku-20240307",  # Modelo estable de Claude 3 Haiku con soporte Vision y compatible con todas las API Keys
             max_tokens=3000,
             messages=[{"role": "user", "content": contenido}]
         )
