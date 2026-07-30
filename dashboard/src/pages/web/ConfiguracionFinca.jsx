@@ -85,6 +85,13 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
   const [genSpacing, setGenSpacing] = useState(15);
   const [genSlant, setGenSlant] = useState(10);
   const [genOrientacion, setGenOrientacion] = useState("horizontal");
+
+  // Estados para Zoom y Pan estilo Google Maps
+  const [escalaZoom, setEscalaZoom] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isDraggingMap, setIsDraggingMap] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [modoUbicarPin, setModoUbicarPin] = useState(false);
   
   // Base de datos local de camas con coordenadas espaciales X, Y y puntos de plagas internos
   const [camasCroquisSVG, setCamasCroquisSVG] = useState([
@@ -209,49 +216,90 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
   };
 
   const handleSvgClick = (e) => {
-    if (modoVistaCroquis !== "calor") return;
-    
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
     
-    const clickX = ((e.clientX - rect.left) / rect.width) * 800;
-    const clickY = ((e.clientY - rect.top) / rect.height) * 450;
+    // Coordenadas relativas en pantalla dentro del elemento SVG
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
     
-    let camaCercana = null;
-    let minDistancia = Infinity;
+    // Traducir coordenadas de pantalla a coordenadas del canvas interno (viewBox 800x450) aplicando zoom y pan
+    const scaleX = (clientX / rect.width) * 800;
+    const scaleY = (clientY / rect.height) * 450;
     
+    const clickX = (scaleX - panOffset.x) / escalaZoom;
+    const clickY = (scaleY - panOffset.y) / escalaZoom;
+    
+    // Buscar si el click cayó dentro de alguna cama
+    let camaClick = null;
     camasCroquisSVG
       .filter(c => c.invernaderoId === invernaderoCroquis)
       .forEach(c => {
-        const centroX = c.x + c.w / 2;
-        const centroY = c.y + c.h / 2;
-        const dist = Math.hypot(clickX - centroX, clickY - centroY);
-        
-        if (dist < minDistancia) {
-          minDistancia = dist;
-          camaCercana = c;
+        if (clickX >= c.x && clickX <= c.x + c.w && clickY >= c.y && clickY <= c.y + c.h) {
+          camaClick = c;
         }
       });
       
-    if (camaCercana && minDistancia < 150) {
-      const localX = clickX - camaCercana.x;
-      let xPct = Math.round((localX / camaCercana.w) * 100);
-      xPct = Math.max(5, Math.min(95, xPct));
-      
-      const nuevosPuntos = [...(camaCercana.puntosPlaga || [])];
-      const nuevoPunto = {
-        id: Date.now(),
-        xPct: xPct,
-        yPct: 50,
-        severidad: 0.6,
-        plaga: "Araña Roja"
-      };
-      nuevosPuntos.push(nuevoPunto);
-      
-      const updated = { ...camaCercana, puntosPlaga: nuevosPuntos };
-      setCamaSeleccionadaCroquis(updated);
-      setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+    if (modoUbicarPin) {
+      if (camaClick) {
+        // Calcular porcentaje a lo largo de la cama
+        const localX = clickX - camaClick.x;
+        let xPct = Math.round((localX / camaClick.w) * 100);
+        xPct = Math.max(5, Math.min(95, xPct));
+        
+        const nuevosPuntos = [...(camaClick.puntosPlaga || [])];
+        const nuevoPunto = {
+          id: Date.now(),
+          xPct: xPct,
+          yPct: 50,
+          severidad: 0.5,
+          plaga: "Araña Roja" // Por defecto
+        };
+        nuevosPuntos.push(nuevoPunto);
+        
+        const updated = { ...camaClick, puntosPlaga: nuevosPuntos };
+        setCamaSeleccionadaCroquis(updated);
+        setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+        setModoUbicarPin(false);
+      } else {
+        alert("Por favor, haz clic DENTRO de una cama de cultivo para colocar el foco.");
+      }
+    } else {
+      // Modo normal de navegación y selección de cama
+      if (camaClick) {
+        setCamaSeleccionadaCroquis(camaClick);
+      } else {
+        // Si hace clic en el fondo del plano, deseleccionar
+        if (e.target.id === "canvas-bg" || e.target.tagName === "svg" || e.target.tagName === "rect") {
+          setCamaSeleccionadaCroquis(null);
+        }
+      }
     }
+  };
+
+  const handleMouseDownMap = (e) => {
+    if (modoUbicarPin) return; // Desactivar paneo si está ubicando pin
+    
+    // Activar paneo si hace click en el fondo del SVG o con botón derecho/medio
+    const esBackground = e.target.id === "canvas-bg" || e.target.tagName === "svg" || e.target.id === "grid-rect";
+    if (esBackground || e.button === 1 || e.button === 2) {
+      setIsDraggingMap(true);
+      setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+      e.preventDefault();
+    }
+  };
+
+  const handleMouseMoveMap = (e) => {
+    if (isDraggingMap) {
+      setPanOffset({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y
+      });
+    }
+  };
+
+  const handleMouseUpMap = () => {
+    setIsDraggingMap(false);
   };
 
   const handleCambiarRol = (nuevoRol) => {
@@ -1770,7 +1818,7 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
         {seccion === "croquis" && (
           <div>
             <h2 style={{ color: "#1a2e1a", marginBottom: "5px" }}>Croquis Interactivo del Invernadero</h2>
-            <p style={{ color: "#666", marginBottom: "25px", marginTop: 0 }}>Distribución real de camas, mapa de calor localizado y auditoría de rutas.</p>
+            <p style={{ color: "#666", marginBottom: "25px", marginTop: 0 }}>Distribución real de camas, mapa de calor localizado y auditoría de rutas. Estilo Google Maps con Zoom &amp; Pan.</p>
             
             {/* Panel Principal Contenedor */}
             <div style={{ display: "flex", gap: "25px", flexWrap: "wrap", alignItems: "stretch" }}>
@@ -2115,26 +2163,26 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
 
                       {/* --- REGISTRO DE FOCOS DE PLAGAS LOCALIZADOS (Multi-Punto) --- */}
                       <div style={{ background: "#fff5f5", padding: "12px", borderRadius: "8px", border: "1px solid #fed7d7", marginTop: "5px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "10px" }}>
                           <h4 style={{ margin: 0, color: "#c53030", fontSize: "0.8rem", fontWeight: "bold" }}>🚨 FOCOS DE PLAGA EN CAMA</h4>
+                          
+                          {/* Botón de Google Maps Pin Placer */}
                           <button
-                            onClick={() => {
-                              const nuevosPuntos = [...(camaSeleccionadaCroquis.puntosPlaga || [])];
-                              const nuevoPunto = {
-                                id: Date.now(),
-                                xPct: 50,
-                                yPct: 50,
-                                severidad: 0.5,
-                                plaga: "Araña Roja"
-                              };
-                              nuevosPuntos.push(nuevoPunto);
-                              const updated = { ...camaSeleccionadaCroquis, puntosPlaga: nuevosPuntos };
-                              setCamaSeleccionadaCroquis(updated);
-                              setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                            onClick={() => setModoUbicarPin(!modoUbicarPin)}
+                            style={{ 
+                              padding: "6px 8px", 
+                              background: modoUbicarPin ? "#3b82f6" : "#e53e3e", 
+                              color: "white", 
+                              border: "none", 
+                              borderRadius: "4px", 
+                              fontSize: "0.72rem", 
+                              fontWeight: "bold", 
+                              cursor: "pointer",
+                              boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                              transition: "all 0.2s"
                             }}
-                            style={{ padding: "3px 8px", background: "#e53e3e", color: "white", border: "none", borderRadius: "4px", fontSize: "0.65rem", fontWeight: "bold", cursor: "pointer" }}
                           >
-                            + Añadir Foco
+                            {modoUbicarPin ? "📍 Haz clic en la cama..." : "📍 Ubicar Foco en Plano"}
                           </button>
                         </div>
 
@@ -2218,10 +2266,10 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                                   
                                   {/* Mapeo Agronómico por Postes */}
                                   <div style={{ marginTop: "6px" }}>
-                                    <label style={{ fontSize: "0.6rem", color: "#742a2a", fontWeight: "bold", display: "block", marginBottom: "4px" }}>📍 Mapear por Poste Físico (Estilo Celular):</label>
+                                    <label style={{ fontSize: "0.65rem", color: "#742a2a", fontWeight: "bold", display: "block", marginBottom: "4px" }}>📍 Mapear por Poste Físico (Estilo Celular):</label>
                                     <div style={{ display: "flex", gap: "3px", justifyContent: "space-between" }}>
                                       {[1, 2, 3, 4, 5].map((posteNum) => {
-                                        const targetPct = posteNum * 20 - 10; // Post 1 = 10%, Post 2 = 30%, Post 3 = 50%, Post 4 = 70%, Post 5 = 90%
+                                        const targetPct = posteNum * 20 - 10;
                                         const esActivo = Math.abs(pt.xPct - targetPct) <= 10;
                                         return (
                                           <button
@@ -2283,6 +2331,30 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                 overflow: "hidden"
               }}>
                 
+                {/* Controles de Zoom Flotantes tipo Google Maps */}
+                <div style={{ position: "absolute", top: "15px", right: "15px", display: "flex", gap: "5px", zIndex: 10 }}>
+                  <button 
+                    onClick={() => setEscalaZoom(prev => Math.min(prev + 0.25, 4))} 
+                    title="Acercar (Zoom In)"
+                    style={{ padding: "6px 12px", background: "white", border: "1px solid #cbd5e1", borderRadius: "4px", fontWeight: "bold", cursor: "pointer", boxShadow: "0 2px 5px rgba(0,0,0,0.1)", color: "#334155" }}
+                  >
+                    ＋
+                  </button>
+                  <button 
+                    onClick={() => setEscalaZoom(prev => Math.max(prev - 0.25, 0.5))} 
+                    title="Alejar (Zoom Out)"
+                    style={{ padding: "6px 12px", background: "white", border: "1px solid #cbd5e1", borderRadius: "4px", fontWeight: "bold", cursor: "pointer", boxShadow: "0 2px 5px rgba(0,0,0,0.1)", color: "#334155" }}
+                  >
+                    －
+                  </button>
+                  <button 
+                    onClick={() => { setEscalaZoom(1); setPanOffset({ x: 0, y: 0 }); }} 
+                    style={{ padding: "6px 10px", background: "white", border: "1px solid #cbd5e1", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "bold", cursor: "pointer", boxShadow: "0 2px 5px rgba(0,0,0,0.1)", color: "#334155" }}
+                  >
+                    Recentrar
+                  </button>
+                </div>
+
                 {/* Cabecera del Plano */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "12px", marginBottom: "15px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -2302,8 +2374,12 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                     viewBox="0 0 800 450" 
                     width="100%" 
                     height="100%"
-                    style={{ display: "block", cursor: modoVistaCroquis === "calor" ? "crosshair" : "default" }}
+                    style={{ display: "block", cursor: modoUbicarPin ? "crosshair" : isDraggingMap ? "grabbing" : "grab" }}
                     onClick={handleSvgClick}
+                    onMouseDown={handleMouseDownMap}
+                    onMouseMove={handleMouseMoveMap}
+                    onMouseUp={handleMouseUpMap}
+                    onMouseLeave={handleMouseUpMap}
                   >
                     <style>
                       {`
@@ -2353,8 +2429,8 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
 
                           return (
                             <radialGradient key={`grad-${c.id}-${pt.id}`} id={`heat-${c.id}-${pt.id}`} cx="50%" cy="50%" r="50%">
-                              <stop offset="0%" stopColor={colorPest} stopOpacity="0.85" />
-                              <stop offset="40%" stopColor={colorPest} stopOpacity="0.45" />
+                              <stop offset="0%" stopColor={colorPest} stopOpacity="0.8" />
+                              <stop offset="50%" stopColor={colorPest} stopOpacity="0.3" />
                               <stop offset="100%" stopColor="#000000" stopOpacity="0" />
                             </radialGradient>
                           );
@@ -2363,146 +2439,173 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                     </defs>
 
                     {/* Fondos */}
-                    <rect width="800" height="450" fill="#f1f5f9" />
-                    <rect width="800" height="450" fill="url(#blueprintGridClaro)" />
-                    <rect width="800" height="450" fill="url(#dotGridClaro)" opacity="0.6" />
+                    <rect id="canvas-bg" width="800" height="450" fill="#f1f5f9" />
+                    <rect width="800" height="450" fill="url(#blueprintGridClaro)" style={{ pointerEvents: "none" }} />
+                    <rect width="800" height="450" fill="url(#dotGridClaro)" opacity="0.6" style={{ pointerEvents: "none" }} />
 
-                    {/* Estructura Exterior Invernadero */}
-                    <rect x="15" y="15" width="770" height="420" rx="12" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeDasharray="10 6" />
-                    <text x="30" y="38" fill="#64748b" fontSize="10" fontWeight="bold" letterSpacing="1.5">ESTRUCTURA DE NAVE PERIMETRAL - PILARES METÁLICOS</text>
+                    {/* --- GRUPO TRANSFORMADO CON ZOOM & PAN --- */}
+                    <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${escalaZoom})`}>
+                      
+                      {/* Estructura Exterior Invernadero */}
+                      <rect x="15" y="15" width="770" height="420" rx="12" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeDasharray="10 6" />
+                      <text x="30" y="38" fill="#64748b" fontSize="10" fontWeight="bold" letterSpacing="1.5" style={{ pointerEvents: "none" }}>ESTRUCTURA DE NAVE PERIMETRAL - PILARES METÁLICOS</text>
 
-                    {/* CAPA 1: TRAZADO GPS DEL MONITOR (Scarab Scout Route) */}
-                    {verRutaMonitor && (
-                      <g id="scouting-route">
-                        {/* Línea de Trayecto (Pasillo) */}
-                        <path 
-                          d="M 40 90 L 760 90 L 760 182 L 40 182 L 40 272 L 760 272" 
-                          fill="none" 
-                          stroke="#64748b" 
-                          strokeWidth="2.5" 
-                          strokeDasharray="6 5" 
-                          opacity="0.7" 
-                        />
-                        <text x="45" y="82" fill="#64748b" fontSize="8" fontWeight="bold" letterSpacing="0.5">TRAYECTORIA AUDITADA DEL MONITOR (GPS)</text>
+                      {/* CAPA 1: TRAZADO GPS DEL MONITOR (Scarab Scout Route) */}
+                      {verRutaMonitor && (
+                        <g id="scouting-route" style={{ pointerEvents: "none" }}>
+                          {/* Línea de Trayecto (Pasillo) */}
+                          <path 
+                            d="M 40 90 L 760 90 L 760 182 L 40 182 L 40 272 L 760 272" 
+                            fill="none" 
+                            stroke="#64748b" 
+                            strokeWidth="2.5" 
+                            strokeDasharray="6 5" 
+                            opacity="0.7" 
+                          />
+                          <text x="45" y="82" fill="#64748b" fontSize="8" fontWeight="bold" letterSpacing="0.5">TRAYECTORIA AUDITADA DEL MONITOR (GPS)</text>
 
-                        {/* Puntos de Registro GPS */}
-                        {[
-                          {x: 100, y: 90, status: "ok"},
-                          {x: 350, y: 90, status: "ok"},
-                          {x: 650, y: 90, status: "ok"},
-                          {x: 760, y: 135, status: "ok"},
-                          {x: 550, y: 182, status: "warning"},
-                          {x: 250, y: 182, status: "ok"},
-                          {x: 40, y: 227, status: "ok"},
-                          {x: 180, y: 272, status: "ok"},
-                          {x: 480, y: 272, status: "ok"}
-                        ].map((pt, i) => {
-                          const haloColor = pt.status === "warning" ? "#ef4444" : "#3b82f6";
-                          return (
-                            <g key={`pt-${i}`} style={{ pointerEvents: "none" }}>
-                              <circle cx={pt.x} cy={pt.y} r="8" fill="none" stroke={haloColor} strokeWidth="1.5" className="gps-pulse" />
-                              <circle cx={pt.x} cy={pt.y} r="4" fill={haloColor} className="pulse-core" />
-                            </g>
-                          );
-                        })}
-                      </g>
-                    )}
+                          {/* Puntos de Registro GPS */}
+                          {[
+                            {x: 100, y: 90, status: "ok"},
+                            {x: 350, y: 90, status: "ok"},
+                            {x: 650, y: 90, status: "ok"},
+                            {x: 760, y: 135, status: "ok"},
+                            {x: 550, y: 182, status: "warning"},
+                            {x: 250, y: 182, status: "ok"},
+                            {x: 40, y: 227, status: "ok"},
+                            {x: 180, y: 272, status: "ok"},
+                            {x: 480, y: 272, status: "ok"}
+                          ].map((pt, i) => {
+                            const haloColor = pt.status === "warning" ? "#ef4444" : "#3b82f6";
+                            return (
+                              <g key={`pt-${i}`}>
+                                <circle cx={pt.x} cy={pt.y} r="8" fill="none" stroke={haloColor} strokeWidth="1.5" className="gps-pulse" />
+                                <circle cx={pt.x} cy={pt.y} r="4" fill={haloColor} className="pulse-core" />
+                              </g>
+                            );
+                          })}
+                        </g>
+                      )}
 
-                    {/* CAPA 2: CAMAS (RECTÁNGULOS BLANCOS) */}
-                    <g id="beds">
-                      {camasCroquisSVG
-                        .filter(c => c.invernaderoId === invernaderoCroquis)
-                        .map((c) => {
-                          // Indicar estado con un borde izquierdo coloreado
-                          let colorEstado = "#cbd5e1"; // Gris
-                          if (c.estado === "Lista Cosecha") colorEstado = "#10b981";
-                          else if (c.estado === "En Crecimiento") colorEstado = "#f97316";
+                      {/* CAPA 2: CAMAS (RECTÁNGULOS BLANCOS) */}
+                      <g id="beds">
+                        {camasCroquisSVG
+                          .filter(c => c.invernaderoId === invernaderoCroquis)
+                          .map((c) => {
+                            let colorEstado = "#cbd5e1";
+                            if (c.estado === "Lista Cosecha") colorEstado = "#10b981";
+                            else if (c.estado === "En Crecimiento") colorEstado = "#f97316";
 
-                          const esSeleccionada = camaSeleccionadaCroquis?.id === c.id;
+                            const esSeleccionada = camaSeleccionadaCroquis?.id === c.id;
 
-                          return (
-                            <g 
-                              key={c.id} 
-                              onClick={() => setCamaSeleccionadaCroquis(c)}
-                              style={{ cursor: "pointer" }}
-                            >
-                              {/* Rectángulo de Cama de Cultivo (Fondo Blanco) */}
-                              <rect
-                                x={c.x}
-                                y={c.y}
-                                width={c.w}
-                                height={c.h}
-                                rx="4"
-                                className="bed-rect"
-                                fill="#ffffff"
-                                stroke={esSeleccionada ? "#2563eb" : "#94a3b8"}
-                                strokeWidth={esSeleccionada ? "3" : "1.5"}
-                              />
-
-                              {/* Barra lateral de estado de siembra (A la izquierda de cada rectángulo) */}
-                              {modoVistaCroquis === "siembra" && (
+                            return (
+                              <g 
+                                key={c.id} 
+                                onClick={(e) => {
+                                  // Prevenir que el click en el fondo deseleccione
+                                  e.stopPropagation();
+                                  setCamaSeleccionadaCroquis(c);
+                                }}
+                                style={{ cursor: "pointer" }}
+                              >
+                                {/* Rectángulo de Cama de Cultivo (Fondo Blanco) */}
                                 <rect
                                   x={c.x}
                                   y={c.y}
-                                  width="6"
+                                  width={c.w}
                                   height={c.h}
-                                  rx="2"
-                                  fill={colorEstado}
+                                  rx="4"
+                                  className="bed-rect"
+                                  fill="#ffffff"
+                                  stroke={esSeleccionada ? "#2563eb" : "#94a3b8"}
+                                  strokeWidth={esSeleccionada ? "3" : "1.5"}
                                 />
-                              )}
 
-                              {/* Nombre de la Cama */}
-                              <text 
-                                x={c.x + 15} 
-                                y={c.y + 18} 
-                                fill="#1e293b" 
-                                fontSize="11" 
-                                fontWeight="bold" 
-                                textAnchor="start"
-                              >
-                                {c.nombre}
-                              </text>
+                                {/* Barra lateral de estado de siembra */}
+                                {modoVistaCroquis === "siembra" && (
+                                  <rect
+                                    x={c.x}
+                                    y={c.y}
+                                    width="6"
+                                    height={c.h}
+                                    rx="2"
+                                    fill={colorEstado}
+                                  />
+                                )}
 
-                              {/* Detalle secundario */}
-                              <text 
-                                x={c.x + c.w - 10} 
-                                y={c.y + 18} 
-                                fill="#64748b" 
-                                fontSize="8.5" 
-                                textAnchor="end"
-                              >
-                                {c.largo}m • {c.variedad}
-                              </text>
-                            </g>
-                          );
-                        })}
-                    </g>
+                                {/* Nombre de la Cama */}
+                                <text 
+                                  x={c.x + 15} 
+                                  y={c.y + 18} 
+                                  fill="#1e293b" 
+                                  fontSize="11" 
+                                  fontWeight="bold" 
+                                  textAnchor="start"
+                                  style={{ pointerEvents: "none" }}
+                                >
+                                  {c.nombre}
+                                </text>
 
-                    {/* CAPA 3: OVERLAY DE MAPA DE CALOR LOCALIZADO (HEATMAP MULTI-PUNTO) */}
-                    {modoVistaCroquis === "calor" && (
-                      <g id="heatmap-layer" style={{ pointerEvents: "none" }}>
-                        {camasCroquisSVG
-                          .filter(c => c.invernaderoId === invernaderoCroquis && c.puntosPlaga && c.puntosPlaga.length > 0)
-                          .flatMap(c => c.puntosPlaga.map((pt) => {
-                            // Calcular coordenada exacta del punto de infección
-                            const cx = c.x + (pt.xPct / 100) * c.w;
-                            const cy = c.y + (pt.yPct / 100) * c.h;
-                            const radioCalor = pt.severidad * 45; // Radio controlado de hotspot
-
-                            return (
-                              <circle 
-                                key={`heat-${c.id}-${pt.id}`}
-                                cx={cx} 
-                                cy={cy} 
-                                r={radioCalor} 
-                                fill={`url(#heat-${c.id}-${pt.id})`}
-                                opacity="0.8"
-                              />
+                                {/* Detalle secundario */}
+                                <text 
+                                  x={c.x + c.w - 10} 
+                                  y={c.y + 18} 
+                                  fill="#64748b" 
+                                  fontSize="8.5" 
+                                  textAnchor="end"
+                                  style={{ pointerEvents: "none" }}
+                                >
+                                  {c.largo}m • {c.variedad}
+                                </text>
+                              </g>
                             );
-                          }))
-                        }
+                          })}
                       </g>
-                    )}
+
+                      {/* CAPA 3: OVERLAY DE MAPA DE CALOR LOCALIZADO (CHINCHETAS Y HALOS DE CALOR CONTROLADOS) */}
+                      {modoVistaCroquis === "calor" && (
+                        <g id="heatmap-layer">
+                          {camasCroquisSVG
+                            .filter(c => c.invernaderoId === invernaderoCroquis && c.puntosPlaga && c.puntosPlaga.length > 0)
+                            .flatMap(c => c.puntosPlaga.map((pt) => {
+                              const cx = c.x + (pt.xPct / 100) * c.w;
+                              const cy = c.y + (pt.yPct / 100) * c.h;
+                              const radioCalor = pt.severidad * 22; // Halo de calor más sutil y localizado
+                              
+                              let colorPest = "#ef4444";
+                              if (pt.plaga === "Trips") colorPest = "#f59e0b";
+                              else if (pt.plaga === "Botrytis") colorPest = "#a855f7";
+
+                              return (
+                                <g key={`plaga-pin-${c.id}-${pt.id}`}>
+                                  {/* 1. Halo de calor difuminado debajo */}
+                                  <circle 
+                                    cx={cx} 
+                                    cy={cy} 
+                                    r={radioCalor} 
+                                    fill={`url(#heat-${c.id}-${pt.id})`}
+                                    style={{ pointerEvents: "none" }}
+                                  />
+
+                                  {/* 2. Chincheta de Geolocalización (Google Maps Pin) */}
+                                  <g transform={`translate(${cx - 8}, ${cy - 18}) scale(0.75)`} style={{ cursor: "help" }}>
+                                    <ellipse cx="12" cy="24" rx="4" ry="1.5" fill="rgba(0,0,0,0.2)" />
+                                    <path 
+                                      d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" 
+                                      fill={colorPest}
+                                      stroke="#ffffff"
+                                      strokeWidth="1.2"
+                                    />
+                                    <title>{`${pt.plaga} (Severidad: ${(pt.severidad*100).toFixed(0)}%)`}</title>
+                                  </g>
+                                </g>
+                              );
+                            }))
+                          }
+                        </g>
+                      )}
+
+                    </g> {/* FIN GRUPO TRANSFORMADO */}
 
                   </svg>
                 </div>
@@ -2542,8 +2645,8 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                       </>
                     )}
                   </div>
-                  <div style={{ fontStyle: "italic" }}>
-                    * Haz clic en una cama para abrir el editor de focos
+                  <div style={{ fontStyle: "italic", fontSize: "0.75rem" }}>
+                    * Paneo: Arrastra el fondo • Zoom: Usa rueda o botones
                   </div>
                 </div>
 
