@@ -36,6 +36,20 @@ app.add_middleware(
 
 Base.metadata.create_all(bind=engine)
 
+# Migración automática al vuelo para agregar columnas de coordenadas de camas si no existen en PostgreSQL
+from sqlalchemy import text
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE camas ADD COLUMN IF NOT EXISTS x DOUBLE PRECISION DEFAULT 0.0;"))
+        conn.execute(text("ALTER TABLE camas ADD COLUMN IF NOT EXISTS y DOUBLE PRECISION DEFAULT 0.0;"))
+        conn.execute(text("ALTER TABLE camas ADD COLUMN IF NOT EXISTS w DOUBLE PRECISION DEFAULT 140.0;"))
+        conn.execute(text("ALTER TABLE camas ADD COLUMN IF NOT EXISTS h DOUBLE PRECISION DEFAULT 45.0;"))
+        conn.execute(text("ALTER TABLE camas ADD COLUMN IF NOT EXISTS invernadero_id INTEGER DEFAULT 1;"))
+        conn.commit()
+    print("[INFO] Columnas de coordenadas (X, Y, W, H) validadas e integradas en base de datos.")
+except Exception as e:
+    print(f"[WARNING] Fallo no crítico en la migración de coordenadas de camas: {e}")
+
 CARPETA_FOTOGRAMAS = os.path.join(os.path.dirname(__file__), "app", "fotogramas_temp")
 
 CARPETA_IMAGENES = "app/imagenes"
@@ -74,6 +88,58 @@ def crear_cama(cama: CamaCreate, db: Session = Depends(get_db)):
 @app.get("/camas/")
 def listar_camas(db: Session = Depends(get_db)):
     return db.query(models.Cama).all()
+
+
+# --- Esquemas y Endpoints para Croquis y Auditoría de Plagas ---
+
+class CamaLayoutUpdate(BaseModel):
+    x: float
+    y: float
+    w: float
+    h: float
+    invernadero_id: int
+
+class IncidenciaPlagaCreate(BaseModel):
+    cama_id: int
+    tipo_plaga: str
+    severidad: float
+    coordenada_interna_x: Optional[float] = None
+    coordenada_interna_y: Optional[float] = None
+
+@app.put("/camas/{cama_id}/layout/")
+def actualizar_cama_layout(cama_id: int, layout: CamaLayoutUpdate, db: Session = Depends(get_db)):
+    cama = db.query(models.Cama).filter(models.Cama.id == cama_id).first()
+    if not cama:
+        raise HTTPException(status_code=404, detail="Cama no encontrada")
+    cama.x = layout.x
+    cama.y = layout.y
+    cama.w = layout.w
+    cama.h = layout.h
+    cama.invernadero_id = layout.invernadero_id
+    db.commit()
+    db.refresh(cama)
+    return cama
+
+@app.post("/plagas/")
+def crear_incidencia_plaga(incidencia: IncidenciaPlagaCreate, db: Session = Depends(get_db)):
+    cama = db.query(models.Cama).filter(models.Cama.id == incidencia.cama_id).first()
+    if not cama:
+        raise HTTPException(status_code=404, detail="Cama no encontrada")
+    nueva = models.IncidenciaPlaga(
+        cama_id=incidencia.cama_id,
+        tipo_plaga=incidencia.tipo_plaga,
+        severidad=incidencia.severidad,
+        coordenada_interna_x=incidencia.coordenada_interna_x,
+        coordenada_interna_y=incidencia.coordenada_interna_y
+    )
+    db.add(nueva)
+    db.commit()
+    db.refresh(nueva)
+    return nueva
+
+@app.get("/plagas/")
+def listar_incidencias_plagas(db: Session = Depends(get_db)):
+    return db.query(models.IncidenciaPlaga).filter(models.IncidenciaPlaga.resuelto == False).all()
 
 
 # --- Carga de imagen y análisis automático ---

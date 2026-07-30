@@ -14,7 +14,7 @@ export default function MovilPreview() {
   const [rolMovil, setRolMovil] = useState("trabajador"); // 'trabajador', 'encargado', 'admin'
 
   // Configuración de API
-  const [apiUrl, setApiUrl] = useState("http://192.168.137.1:8000");
+  const [apiUrl, setApiUrl] = useState(import.meta.env.VITE_API_URL || "http://192.168.137.1:8000");
 
   // Al cambiar el rol exterior, sincronizamos el usuario ficticio de sesión para darle realismo
   useEffect(() => {

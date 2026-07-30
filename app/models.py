@@ -23,8 +23,16 @@ class Cama(Base):
     responsable = Column(String(150), nullable=True)
     fecha_creacion = Column(DateTime, default=obtener_hora_ecuador)
 
+    # Coordenadas relativas espaciales para el Croquis SVG
+    x = Column(Float, default=0.0)
+    y = Column(Float, default=0.0)
+    w = Column(Float, default=140.0)
+    h = Column(Float, default=45.0)
+    invernadero_id = Column(Integer, default=1)
+
     registros = relationship("Registro", back_populates="cama")
     segmentos = relationship("Segmento", back_populates="cama")
+    incidencias_plagas = relationship("IncidenciaPlaga", back_populates="cama", cascade="all, delete-orphan")
 
 
 class Registro(Base):
@@ -146,3 +154,18 @@ class HistorialProyeccion(Base):
     botones_proyectados = Column(Integer, default=0)
     botones_cosechados_real = Column(Integer, nullable=True)
     comparado = Column(Boolean, default=False)
+
+
+class IncidenciaPlaga(Base):
+    __tablename__ = "incidencias_plagas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cama_id = Column(Integer, ForeignKey("camas.id"), nullable=False)
+    tipo_plaga = Column(String(100), nullable=False)  # Araña Roja, Trips, Botrytis, etc.
+    severidad = Column(Float, default=0.0)  # Intensidad de 0.0 a 1.0
+    fecha_registro = Column(DateTime, default=obtener_hora_ecuador)
+    coordenada_interna_x = Column(Float, nullable=True)  # Coordenada X exacta
+    coordenada_interna_y = Column(Float, nullable=True)  # Coordenada Y exacta
+    resuelto = Column(Boolean, default=False)
+
+    cama = relationship("Cama", back_populates="incidencias_plagas")

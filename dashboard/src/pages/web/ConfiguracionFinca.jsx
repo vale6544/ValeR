@@ -70,6 +70,35 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
   const [invernaderoCroquis, setInvernaderoCroquis] = useState(1);
   const [camaSeleccionadaCroquis, setCamaSeleccionadaCroquis] = useState(null);
 
+  // Estados agronómicos avanzados para el Croquis SVG interactivo
+  const [modoVistaCroquis, setModoVistaCroquis] = useState("siembra"); // "siembra" o "calor"
+  const [verRutaMonitor, setVerRutaMonitor] = useState(true);
+  const [camaEditando, setCamaEditando] = useState(null);
+  
+  // Base de datos local de camas con coordenadas espaciales X, Y y severidad de plagas
+  const [camasCroquisSVG, setCamasCroquisSVG] = useState([
+    // Invernadero 1: Galpón Norte (Rosas Freedom)
+    { id: 1, invernaderoId: 1, nombre: "Cama 1-1", x: 60, y: 60, w: 140, h: 45, largo: 60, ancho: 1.2, estado: "Lista Cosecha", plaga: "Araña Roja", severidad: 0.8, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 150, totalBotones: 130, confianza: 95 },
+    { id: 2, invernaderoId: 1, nombre: "Cama 1-2", x: 230, y: 60, w: 140, h: 45, largo: 60, ancho: 1.2, estado: "En Crecimiento", plaga: "Ninguna", severidad: 0.0, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 110, totalBotones: 95, confianza: 93 },
+    { id: 3, invernaderoId: 1, nombre: "Cama 1-3", x: 400, y: 60, w: 140, h: 45, largo: 60, ancho: 1.2, estado: "Sin censo", plaga: "Ninguna", severidad: 0.0, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 0, totalBotones: 0, confianza: 0 },
+    { id: 4, invernaderoId: 1, nombre: "Cama 1-4", x: 570, y: 60, w: 140, h: 45, largo: 60, ancho: 1.2, estado: "Lista Cosecha", plaga: "Trips", severidad: 0.5, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 145, totalBotones: 120, confianza: 92 },
+    { id: 5, invernaderoId: 1, nombre: "Cama 2-1", x: 60, y: 160, w: 140, h: 45, largo: 55, ancho: 1.2, estado: "En Crecimiento", plaga: "Ninguna", severidad: 0.0, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 98, totalBotones: 85, confianza: 94 },
+    { id: 6, invernaderoId: 1, nombre: "Cama 2-2", x: 230, y: 160, w: 140, h: 45, largo: 55, ancho: 1.2, estado: "Lista Cosecha", plaga: "Botrytis", severidad: 0.9, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 160, totalBotones: 140, confianza: 96 },
+    { id: 7, invernaderoId: 1, nombre: "Cama 2-3", x: 400, y: 160, w: 140, h: 45, largo: 55, ancho: 1.2, estado: "Sin censo", plaga: "Ninguna", severidad: 0.0, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 0, totalBotones: 0, confianza: 0 },
+    { id: 8, invernaderoId: 1, nombre: "Cama 2-4", x: 570, y: 160, w: 140, h: 45, largo: 55, ancho: 1.2, estado: "En Crecimiento", plaga: "Ninguna", severidad: 0.0, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 105, totalBotones: 90, confianza: 93 },
+    { id: 9, invernaderoId: 1, nombre: "Cama 3-1", x: 60, y: 260, w: 140, h: 45, largo: 50, ancho: 1.2, estado: "Lista Cosecha", plaga: "Ninguna", severidad: 0.0, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 130, totalBotones: 110, confianza: 95 },
+    { id: 10, invernaderoId: 1, nombre: "Cama 3-2", x: 230, y: 260, w: 140, h: 45, largo: 50, ancho: 1.2, estado: "Sin censo", plaga: "Ninguna", severidad: 0.0, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 0, totalBotones: 0, confianza: 0 },
+    { id: 11, invernaderoId: 1, nombre: "Cama 3-3", x: 400, y: 260, w: 140, h: 45, largo: 50, ancho: 1.2, estado: "En Crecimiento", plaga: "Trips", severidad: 0.3, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 88, totalBotones: 75, confianza: 94 },
+    { id: 12, invernaderoId: 1, nombre: "Cama 3-4", x: 570, y: 260, w: 140, h: 45, largo: 50, ancho: 1.2, estado: "Lista Cosecha", plaga: "Ninguna", severidad: 0.0, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 155, totalBotones: 135, confianza: 96 },
+    
+    // Invernadero 2: Galpón Sur (Rosas Explorer)
+    { id: 13, invernaderoId: 2, nombre: "Cama S-1", x: 80, y: 80, w: 150, h: 50, largo: 40, ancho: 1.2, estado: "Lista Cosecha", plaga: "Araña Roja", severidad: 0.75, responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 120, totalBotones: 102, confianza: 94 },
+    { id: 14, invernaderoId: 2, nombre: "S-2 Fila Este", x: 270, y: 80, w: 150, h: 50, largo: 40, ancho: 1.2, estado: "En Crecimiento", plaga: "Ninguna", severidad: 0.0, responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 85, totalBotones: 72, confianza: 92 },
+    { id: 15, invernaderoId: 2, nombre: "S-3 Lateral", x: 460, y: 80, w: 150, h: 50, largo: 35, ancho: 1.1, estado: "Sin censo", plaga: "Ninguna", severidad: 0.0, responsable: "Miguel Rojas", variedad: "Rosas Explorer", totalTallos: 0, totalBotones: 0, confianza: 0 },
+    { id: 16, invernaderoId: 2, nombre: "S-4 Central", x: 80, y: 200, w: 150, h: 50, largo: 40, ancho: 1.2, estado: "Lista Cosecha", plaga: "Botrytis", severidad: 0.4, responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 130, totalBotones: 112, confianza: 95 },
+    { id: 17, invernaderoId: 2, nombre: "S-5 Fila Oeste", x: 270, y: 200, w: 150, h: 50, largo: 40, ancho: 1.2, estado: "En Crecimiento", plaga: "Ninguna", severidad: 0.0, responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 92, totalBotones: 80, confianza: 93 }
+  ]);
+
   // Control de Roles y Permisos (Mock)
   const [rolActual, setRolActual] = useState("admin");
   const [permisosSupervisor, setPermisosSupervisor] = useState({
@@ -1630,292 +1659,592 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
           </div>
         )}
 
-        {/* =======================================
+           {/* =======================================
             SECCIÓN 8: CROQUIS INTERACTIVO DE LA FINCA (PLANO 2D BLUEPRINT)
             ======================================= */}
         {seccion === "croquis" && (
           <div>
-            <h2 style={{ color: "#1a2e1a", marginBottom: "5px" }}>Croquis de la Finca (Plano 2D Blueprint)</h2>
-            <p style={{ color: "#666", marginBottom: "30px", marginTop: 0 }}>Vista satelital y distribución técnica de camas de rosas en la hacienda</p>
+            <h2 style={{ color: "#1a2e1a", marginBottom: "5px" }}>Croquis Interactivo del Invernadero</h2>
+            <p style={{ color: "#666", marginBottom: "25px", marginTop: 0 }}>Distribución espacial, mapa de calor de plagas y auditoría de rutas en tiempo real.</p>
             
-            {/* Controles de Configuración del Croquis */}
-            <div style={{ background: "white", padding: "20px", borderRadius: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", marginBottom: "30px", display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "flex-end" }}>
-              <div style={{ flex: 1, minWidth: "200px" }}>
-                <label style={{ display: "block", marginBottom: "5px", color: "#4a5568", fontWeight: "600", fontSize: "0.85rem" }}>Seleccionar Invernadero</label>
-                <select 
-                  value={invernaderoCroquis} 
-                  onChange={(e) => setInvernaderoCroquis(parseInt(e.target.value))}
-                  style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                >
-                  <option value="1">Galpón Norte (Rosas Freedom)</option>
-                  <option value="2">Galpón Sur (Rosas Explorer)</option>
-                </select>
-              </div>
-              <div style={{ width: "180px" }}>
-                <label style={{ display: "block", marginBottom: "5px", color: "#4a5568", fontWeight: "600", fontSize: "0.85rem" }}>Camas de Ancho (Columnas)</label>
-                <input 
-                  type="number" 
-                  min="2" 
-                  max="12" 
-                  value={croquisAncho} 
-                  onChange={(e) => setCroquisAncho(Math.max(2, parseInt(e.target.value) || 2))}
-                  style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                />
-              </div>
-              <div style={{ width: "180px" }}>
-                <label style={{ display: "block", marginBottom: "5px", color: "#4a5568", fontWeight: "600", fontSize: "0.85rem" }}>Camas de Largo (Filas)</label>
-                <input 
-                  type="number" 
-                  min="2" 
-                  max="30" 
-                  value={croquisLargo} 
-                  onChange={(e) => setCroquisLargo(Math.max(2, parseInt(e.target.value) || 2))}
-                  style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
-                />
-              </div>
-            </div>
-
-            {/* Leyenda de Colores */}
-            <div style={{ display: "flex", gap: "20px", marginBottom: "25px", flexWrap: "wrap", fontSize: "0.9rem", color: "#4a5568", background: "#f8fafc", padding: "15px 20px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
-              <span style={{ fontWeight: "bold", color: "#2d5a27" }}>Estados del Cultivo:</span>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{ width: "24px", height: "10px", borderRadius: "2px", background: "#94a3b8", border: "1px solid #64748b" }}></div>
-                <span>Gris (Sin datos)</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{ width: "24px", height: "10px", borderRadius: "2px", background: "#10b981", boxShadow: "0 2px 4px rgba(16,185,129,0.2)" }}></div>
-                <span>Verde (Lista para Cosecha)</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{ width: "24px", height: "10px", borderRadius: "2px", background: "#f97316", boxShadow: "0 2px 4px rgba(249,115,22,0.2)" }}></div>
-                <span>Naranja (Crecimiento)</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <div style={{ width: "24px", height: "10px", borderRadius: "2px", background: "#ef4444", boxShadow: "0 2px 4px rgba(239,68,68,0.2)" }}></div>
-                <span>Rojo (Alerta Sanitaria / Plaga)</span>
-              </div>
-            </div>
-
-            {/* Rejilla Interactiva estilo Blueprint Plano 2D Claro */}
-            <div style={{ 
-              background: "#f4f6f4", 
-              backgroundImage: "radial-gradient(#aac9a0 1.5px, transparent 0)",
-              backgroundSize: "24px 24px",
-              padding: "40px", 
-              borderRadius: "16px", 
-              boxShadow: "0 4px 15px rgba(0,0,0,0.05)",
-              border: "3px solid #cbd5e1",
-              overflowX: "auto"
-            }}>
+            {/* Panel Principal Contenedor */}
+            <div style={{ display: "flex", gap: "25px", flexWrap: "wrap", alignItems: "stretch" }}>
               
-              {/* Estructura del Galpón Físico */}
-              <div style={{
-                border: "2px dashed #aac9a0",
-                borderRadius: "12px",
-                padding: "30px 20px",
-                background: "rgba(229,240,228,0.4)",
-                position: "relative"
+              {/* BANNER LATERAL DE CONTROL (30% de ancho aproximado) */}
+              <div style={{ 
+                flex: "1 1 320px", 
+                maxWidth: "400px", 
+                background: "white", 
+                padding: "20px", 
+                borderRadius: "12px", 
+                boxShadow: "0 4px 12px rgba(0,0,0,0.05)", 
+                border: "1px solid #cbd5e1",
+                display: "flex",
+                flexDirection: "column",
+                gap: "18px"
               }}>
-                <div style={{
-                  position: "absolute",
-                  top: "-12px",
-                  left: "20px",
-                  background: "white",
-                  padding: "2px 10px",
-                  color: "#2d5a27",
-                  fontSize: "0.75rem",
-                  fontWeight: "bold",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "4px",
-                  letterSpacing: "1px"
-                }}>
-                  PLANO 2D ESQUEMÁTICO: {invernaderoCroquis === 1 ? "GALPÓN NORTE (FREEDOM)" : "GALPÓN SUR (EXPLORER)"}
-                </div>
-
-                <div style={{ 
-                  display: "grid", 
-                  gridTemplateColumns: `repeat(${croquisAncho}, 1fr)`, 
-                  gap: "25px 20px",
-                  width: "100%"
-                }}>
-                  {Array.from({ length: croquisLargo * croquisAncho }).map((_, idx) => {
-                    const col = (idx % croquisAncho) + 1;
-                    const row = Math.floor(idx / croquisAncho) + 1;
-                    const bedNum = idx + 1;
-                    const camaNombre = `Cama ${row}-${col}`;
-
-                    // Determinar color de forma pseudo-aleatoria pero fija por celda
-                    let bgColor = "#94a3b8"; // Gris claro
-                    let labelEstado = "Sin censo";
-                    let borderStyle = "1px solid #cbd5e1";
-                    let badge = null;
-
-                    if (bedNum % 7 === 0) {
-                      bgColor = "#ef4444";
-                      labelEstado = "Alerta Sanitaria";
-                      badge = "⚠️";
-                    } else if (bedNum % 5 === 0) {
-                      bgColor = "#f97316";
-                      labelEstado = "En Crecimiento";
-                      badge = "🌱";
-                    } else if (bedNum % 3 === 0) {
-                      bgColor = "#10b981";
-                      labelEstado = "Lista Cosecha";
-                      badge = "✂️";
-                    }
-
-                    // Dimensiones y cosecha simulada para cálculos
-                    const largo = 50 + (bedNum % 3) * 5;
-                    const ancho = 1.2;
-                    const area = largo * ancho;
-                    const cosechaListos = 20 + (bedNum * 5) % 30;
-                    const productividad = (cosechaListos / area).toFixed(2);
-
-                    return (
-                      <div 
-                        key={idx}
-                        onClick={() => setCamaSeleccionadaCroquis({
-                          nombre: camaNombre,
-                          estado: labelEstado,
-                          bgColor,
-                          badge,
-                          largo,
-                          ancho,
-                          area,
-                          cosechaListos,
-                          productividad,
-                          totalTallos: 100 + (bedNum * 3) % 45,
-                          totalBotones: 90 + (bedNum * 2) % 35,
-                          confianza: (92 + (bedNum * 1.3) % 7).toFixed(1),
-                          plaga: bedNum % 7 === 0 ? "Araña Roja (Severidad Alta)" : null,
-                          responsable: bedNum % 2 === 0 ? "Luis Silva" : "Miguel Rojas"
-                        })}
-                        style={{
-                          background: "white",
-                          border: borderStyle,
-                          borderLeft: `6px solid ${bgColor}`,
-                          borderRadius: "6px",
-                          padding: "12px 15px",
-                          height: "60px",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          transition: "all 0.2s ease",
-                          boxShadow: "0 2px 5px rgba(0,0,0,0.05)"
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "scale(1.05)";
-                          e.currentTarget.style.background = "#e5f0e4";
-                          e.currentTarget.style.borderColor = "#2d5a27";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "none";
-                          e.currentTarget.style.background = "white";
-                          e.currentTarget.style.borderColor = "#cbd5e1";
-                        }}
-                      >
-                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                          <span style={{ fontWeight: "bold", color: "#1a2e1a", fontSize: "0.85rem" }}>{camaNombre}</span>
-                          <span style={{ fontSize: "0.7rem", color: "#64748b" }}>{largo}m x {ancho}m ({productividad} t/m²)</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ fontSize: "0.7rem", color: bgColor === "#94a3b8" ? "#475569" : "white", fontWeight: "bold", background: bgColor === "#94a3b8" ? "#f1f5f9" : bgColor, padding: "2px 6px", borderRadius: "4px" }}>
-                            {labelEstado}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Modal de Detalle Cama Croquis */}
-            {camaSeleccionadaCroquis && (
-              <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999 }}>
-                <div style={{ background: "white", padding: "30px", borderRadius: "15px", width: "480px", boxShadow: "0 10px 30px rgba(0,0,0,0.2)", position: "relative" }}>
-                  <button 
-                    onClick={() => setCamaSeleccionadaCroquis(null)} 
-                    style={{ position: "absolute", top: "15px", right: "15px", background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#777" }}
+                
+                {/* 1. Selector de Invernadero */}
+                <div>
+                  <label style={{ display: "block", marginBottom: "6px", color: "#475569", fontWeight: "700", fontSize: "0.8rem", uppercase: "true", letterSpacing: "0.5px" }}>INVERNADERO ACTIVO</label>
+                  <select 
+                    value={invernaderoCroquis} 
+                    onChange={(e) => {
+                      setInvernaderoCroquis(parseInt(e.target.value));
+                      setCamaSeleccionadaCroquis(null);
+                    }}
+                    style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f8fafc", fontWeight: "600", fontSize: "0.9rem" }}
                   >
-                    ×
-                  </button>
+                    <option value="1">Galpón Norte (Rosas Freedom)</option>
+                    <option value="2">Galpón Sur (Rosas Explorer)</option>
+                  </select>
+                </div>
+
+                {/* 2. Interruptores de Capas y Modos */}
+                <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "15px" }}>
+                  <label style={{ display: "block", marginBottom: "10px", color: "#475569", fontWeight: "700", fontSize: "0.8rem", letterSpacing: "0.5px" }}>CAPAS DEL MAPA</label>
                   
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
-                    <h3 style={{ margin: 0, color: "#1a2e1a" }}>{camaSeleccionadaCroquis.nombre}</h3>
-                    <span style={{ background: "#e5f0e4", color: "#2d5a27", padding: "4px 10px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: "bold", border: "1px solid rgba(0,0,0,0.1)" }}>
-                      {camaSeleccionadaCroquis.estado}
-                    </span>
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "0.9rem", color: "#444", borderTop: "1px solid #f0f4f0", paddingTop: "15px" }}>
-                    <div>Invernadero: <strong>{invernaderoCroquis === 1 ? "Galpón Norte" : "Galpón Sur"}</strong></div>
-                    <div>Variedad: <strong>{invernaderoCroquis === 1 ? "Rosas Freedom" : "Rosas Explorer"}</strong></div>
-                    <div>Dimensiones: <strong>{camaSeleccionadaCroquis.largo}m de Largo × {camaSeleccionadaCroquis.ancho}m de Ancho</strong></div>
-                    <div>Área de Cultivo: <strong>{camaSeleccionadaCroquis.area.toFixed(1)} m²</strong></div>
-                    <div>Operador Responsable: <strong>{camaSeleccionadaCroquis.responsable}</strong></div>
-                    
-                    {camaSeleccionadaCroquis.estado !== "Sin censo" ? (
-                      <div style={{ background: "#f8fafc", padding: "15px", borderRadius: "8px", border: "1px solid #e2e8f0", marginTop: "10px" }}>
-                        <h4 style={{ margin: "0 0 10px 0", color: "#2d5a27" }}>Censo IA y Productividad</h4>
-                        
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
-                          <div>Total Tallos: <strong>{camaSeleccionadaCroquis.totalTallos}</strong></div>
-                          <div>Con Botón: <strong>{camaSeleccionadaCroquis.totalBotones}</strong></div>
-                          <div>Listos Corte: <strong style={{ color: "#10b981" }}>{camaSeleccionadaCroquis.cosechaListos}</strong></div>
-                          <div>Confianza IA: <strong>{camaSeleccionadaCroquis.confianza}%</strong></div>
-                        </div>
-
-                        {/* Métrica de Productividad por m2 */}
-                        <div style={{ borderTop: "1px solid #cbd5e1", paddingTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "0.85rem", color: "#475569", fontWeight: "600" }}>Productividad por m²:</span>
-                          <span style={{ fontSize: "1rem", color: "#2d5a27", fontWeight: "bold" }}>
-                            {camaSeleccionadaCroquis.productividad} tallos/m²
-                          </span>
-                        </div>
-
-                        {camaSeleccionadaCroquis.plaga && (
-                          <div style={{ color: "#dc2626", marginTop: "10px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "6px" }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                              <line x1="12" y1="9" x2="12" y2="13"></line>
-                              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                            </svg>
-                            <span>Plaga: {camaSeleccionadaCroquis.plaga}</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ background: "#f4f6f4", padding: "12px", borderRadius: "8px", color: "#666", textAlign: "center", border: "1px dashed #cbd5e1", marginTop: "10px" }}>
-                        Esta cama no registra censos de video procesados aún.
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-                    {camaSeleccionadaCroquis.estado === "Lista Cosecha" && (
-                      <button 
-                        onClick={() => {
-                          alert(`Simulación: Registrando cosecha para ${camaSeleccionadaCroquis.nombre}.`);
-                          setCamaSeleccionadaCroquis(null);
-                        }}
-                        style={{ flex: 1.5, padding: "10px", background: "#2d5a27", color: "white", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}
-                      >
-                        Registrar Cosecha
-                      </button>
-                    )}
-                    <button 
-                      onClick={() => setCamaSeleccionadaCroquis(null)} 
-                      style={{ flex: 1, padding: "10px", background: "#f4f6f4", border: "1px solid #cbd5e1", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}
+                  {/* Modo de Vista */}
+                  <div style={{ display: "flex", background: "#f1f5f9", padding: "4px", borderRadius: "8px", marginBottom: "12px" }}>
+                    <button
+                      onClick={() => setModoVistaCroquis("siembra")}
+                      style={{
+                        flex: 1,
+                        padding: "8px 12px",
+                        border: "none",
+                        borderRadius: "6px",
+                        fontSize: "0.8rem",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        background: modoVistaCroquis === "siembra" ? "white" : "transparent",
+                        color: modoVistaCroquis === "siembra" ? "#2d5a27" : "#64748b",
+                        boxShadow: modoVistaCroquis === "siembra" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
+                        transition: "all 0.2s ease"
+                      }}
                     >
-                      Cerrar
+                      🌱 Cultivo
+                    </button>
+                    <button
+                      onClick={() => setModoVistaCroquis("calor")}
+                      style={{
+                        flex: 1,
+                        padding: "8px 12px",
+                        border: "none",
+                        borderRadius: "6px",
+                        fontSize: "0.8rem",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        background: modoVistaCroquis === "calor" ? "white" : "transparent",
+                        color: modoVistaCroquis === "calor" ? "#ef4444" : "#64748b",
+                        boxShadow: modoVistaCroquis === "calor" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
+                        transition: "all 0.2s ease"
+                      }}
+                    >
+                      🔥 Calor Plagas
                     </button>
                   </div>
 
+                  {/* Toggle Ruta GPS */}
+                  <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "0.85rem", color: "#334155", background: "#f8fafc", padding: "8px 12px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                    <input
+                      type="checkbox"
+                      checked={verRutaMonitor}
+                      onChange={(e) => setVerRutaMonitor(e.target.checked)}
+                      style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                    />
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <strong>Ruta del Monitor GPS</strong>
+                      <span style={{ fontSize: "0.7rem", color: "#64748b" }}>Trazado del recorrido en campo</span>
+                    </div>
+                  </label>
                 </div>
+
+                {/* 3. Editor de Camas Dinámico */}
+                <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "15px", flex: 1 }}>
+                  {!camaSeleccionadaCroquis ? (
+                    <div style={{ background: "#f8fafc", padding: "18px", borderRadius: "8px", border: "1px dashed #cbd5e1", textAlign: "center", color: "#64748b" }}>
+                      <p style={{ margin: "0 0 12px 0", fontSize: "0.85rem" }}>Selecciona una cama en el plano para editar sus dimensiones o registrar incidencias de plaga.</p>
+                      <button
+                        onClick={() => {
+                          const nuevoId = Math.max(...camasCroquisSVG.map(c => c.id), 0) + 1;
+                          const nuevaCama = {
+                            id: nuevoId,
+                            invernaderoId: invernaderoCroquis,
+                            nombre: `Cama ${camasCroquisSVG.filter(c => c.invernaderoId === invernaderoCroquis).length + 1}`,
+                            x: 100 + (nuevoId * 40) % 500,
+                            y: 100 + (nuevoId * 30) % 200,
+                            w: 140,
+                            h: 45,
+                            largo: 50,
+                            ancho: 1.2,
+                            estado: "Sin censo",
+                            plaga: "Ninguna",
+                            severidad: 0.0,
+                            responsable: "Luis Silva",
+                            variedad: invernaderoCroquis === 1 ? "Rosas Freedom" : "Rosas Explorer",
+                            totalTallos: 0,
+                            totalBotones: 0,
+                            confianza: 0
+                          };
+                          setCamasCroquisSVG(prev => [...prev, nuevaCama]);
+                          setCamaSeleccionadaCroquis(nuevaCama);
+                        }}
+                        style={{ padding: "8px 14px", background: "#2d5a27", color: "white", border: "none", borderRadius: "6px", fontSize: "0.8rem", fontWeight: "bold", cursor: "pointer" }}
+                      >
+                        ➕ Crear Nueva Cama
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontWeight: "bold", color: "#1e293b", fontSize: "0.95rem" }}>Propiedades de Cama</span>
+                        <button 
+                          onClick={() => {
+                            if (window.confirm("¿Seguro que deseas eliminar esta cama de la distribución?")) {
+                              setCamasCroquisSVG(prev => prev.filter(c => c.id !== camaSeleccionadaCroquis.id));
+                              setCamaSeleccionadaCroquis(null);
+                            }
+                          }}
+                          style={{ border: "none", background: "none", color: "#ef4444", fontSize: "0.8rem", fontWeight: "bold", cursor: "pointer" }}
+                        >
+                          🗑️ Eliminar
+                        </button>
+                      </div>
+
+                      {/* Inputs de coordenadas y datos */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                        <div>
+                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Nombre</label>
+                          <input
+                            type="text"
+                            value={camaSeleccionadaCroquis.nombre}
+                            onChange={(e) => {
+                              const updated = { ...camaSeleccionadaCroquis, nombre: e.target.value };
+                              setCamaSeleccionadaCroquis(updated);
+                              setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                            }}
+                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Variedad</label>
+                          <input
+                            type="text"
+                            value={camaSeleccionadaCroquis.variedad}
+                            onChange={(e) => {
+                              const updated = { ...camaSeleccionadaCroquis, variedad: e.target.value };
+                              setCamaSeleccionadaCroquis(updated);
+                              setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                            }}
+                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                        <div>
+                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Posición X (SVG)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="700"
+                            value={camaSeleccionadaCroquis.x}
+                            onChange={(e) => {
+                              const updated = { ...camaSeleccionadaCroquis, x: parseInt(e.target.value) || 0 };
+                              setCamaSeleccionadaCroquis(updated);
+                              setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                            }}
+                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Posición Y (SVG)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="400"
+                            value={camaSeleccionadaCroquis.y}
+                            onChange={(e) => {
+                              const updated = { ...camaSeleccionadaCroquis, y: parseInt(e.target.value) || 0 };
+                              setCamaSeleccionadaCroquis(updated);
+                              setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                            }}
+                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                        <div>
+                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Largo Cama (m)</label>
+                          <input
+                            type="number"
+                            value={camaSeleccionadaCroquis.largo}
+                            onChange={(e) => {
+                              const updated = { ...camaSeleccionadaCroquis, largo: parseFloat(e.target.value) || 0 };
+                              setCamaSeleccionadaCroquis(updated);
+                              setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                            }}
+                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Estado Censo</label>
+                          <select
+                            value={camaSeleccionadaCroquis.estado}
+                            onChange={(e) => {
+                              const updated = { ...camaSeleccionadaCroquis, estado: e.target.value };
+                              setCamaSeleccionadaCroquis(updated);
+                              setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                            }}
+                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                          >
+                            <option value="Lista Cosecha">Lista Cosecha</option>
+                            <option value="En Crecimiento">En Crecimiento</option>
+                            <option value="Sin censo">Sin censo</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Registro de Incidencias de Plaga */}
+                      <div style={{ background: "#fff5f5", padding: "12px", borderRadius: "8px", border: "1px solid #fed7d7", marginTop: "5px" }}>
+                        <h4 style={{ margin: "0 0 10px 0", color: "#c53030", fontSize: "0.8rem", fontWeight: "bold" }}>🚨 AUDITORÍA DE PLAGAS</h4>
+                        
+                        <div style={{ marginBottom: "8px" }}>
+                          <label style={{ fontSize: "0.7rem", color: "#742a2a", display: "block" }}>Tipo de Plaga</label>
+                          <select
+                            value={camaSeleccionadaCroquis.plaga}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const updated = { 
+                                ...camaSeleccionadaCroquis, 
+                                plaga: val,
+                                severidad: val === "Ninguna" ? 0.0 : camaSeleccionadaCroquis.severidad || 0.5 
+                              };
+                              setCamaSeleccionadaCroquis(updated);
+                              setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                            }}
+                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #f5c2c2", fontSize: "0.8rem" }}
+                          >
+                            <option value="Ninguna">Sana (Ninguna)</option>
+                            <option value="Araña Roja">Araña Roja</option>
+                            <option value="Trips">Trips</option>
+                            <option value="Botrytis">Botrytis</option>
+                          </select>
+                        </div>
+
+                        {camaSeleccionadaCroquis.plaga !== "Ninguna" && (
+                          <div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "#742a2a", fontWeight: "bold" }}>
+                              <span>Severidad (Heatmap)</span>
+                              <span>{(camaSeleccionadaCroquis.severidad * 100).toFixed(0)}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0.1"
+                              max="1.0"
+                              step="0.05"
+                              value={camaSeleccionadaCroquis.severidad}
+                              onChange={(e) => {
+                                const updated = { ...camaSeleccionadaCroquis, severidad: parseFloat(e.target.value) };
+                                setCamaSeleccionadaCroquis(updated);
+                                setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                              }}
+                              style={{ width: "100%", accentColor: "#e53e3e", cursor: "pointer" }}
+                            />
+                            <div style={{ fontSize: "0.65rem", color: "#9b2c2c", textAlign: "center", marginTop: "2px" }}>
+                              {camaSeleccionadaCroquis.severidad > 0.7 ? "🔴 Foco Crítico (Fumigación)" : camaSeleccionadaCroquis.severidad > 0.4 ? "🟡 Alerta Moderada" : "🟢 Alerta Leve"}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => setCamaSeleccionadaCroquis(null)}
+                        style={{ width: "100%", padding: "8px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "6px", fontWeight: "bold", fontSize: "0.8rem", cursor: "pointer" }}
+                      >
+                        Cerrar Editor
+                      </button>
+                    </div>
+                  )}
+                </div>
+
               </div>
-            )}
+
+              {/* VISTA DEL PLANO INTERACTIVO SVG (70% de ancho aproximado) */}
+              <div style={{ 
+                flex: "2 1 600px", 
+                background: "#0f172a", 
+                borderRadius: "12px", 
+                border: "2px solid #334155", 
+                boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
+                padding: "20px",
+                display: "flex",
+                flexDirection: "column",
+                position: "relative",
+                overflow: "hidden"
+              }}>
+                
+                {/* Cabecera del Plano */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "12px", marginBottom: "15px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981" }}></div>
+                    <span style={{ color: "#94a3b8", fontSize: "0.8rem", fontWeight: "bold", letterSpacing: "1px" }}>
+                      VISTA DIGITAL: {invernaderoCroquis === 1 ? "GALPÓN NORTE (FREEDOM)" : "GALPÓN SUR (EXPLORER)"}
+                    </span>
+                  </div>
+                  <span style={{ color: "#64748b", fontSize: "0.75rem" }}>
+                    {camasCroquisSVG.filter(c => c.invernaderoId === invernaderoCroquis).length} Camas Configuradas
+                  </span>
+                </div>
+
+                {/* Lienzo SVG */}
+                <div style={{ width: "100%", position: "relative", background: "#020617", borderRadius: "8px" }}>
+                  <svg 
+                    viewBox="0 0 800 450" 
+                    width="100%" 
+                    height="100%"
+                    style={{ display: "block" }}
+                  >
+                    <style>
+                      {`
+                        .gps-pulse {
+                          animation: gpsPulse 2.5s infinite ease-out;
+                        }
+                        @keyframes gpsPulse {
+                          0% { r: 3; opacity: 1; }
+                          100% { r: 16; opacity: 0; }
+                        }
+                        .pulse-core {
+                          animation: corePulse 1s infinite alternate;
+                        }
+                        @keyframes corePulse {
+                          0% { r: 3.5; }
+                          100% { r: 5; }
+                        }
+                        .bed-rect {
+                          transition: all 0.25s ease;
+                        }
+                        .bed-rect:hover {
+                          stroke: #facc15 !important;
+                          stroke-width: 2.5px !important;
+                          filter: drop-shadow(0px 0px 8px rgba(255,255,255,0.15));
+                        }
+                      `}
+                    </style>
+
+                    {/* Defs para patrones de cuadrícula y gradientes de calor */}
+                    <defs>
+                      {/* Cuadrícula Blueprint */}
+                      <pattern id="blueprintGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" strokeWidth="1" />
+                      </pattern>
+                      <pattern id="dotGrid" width="10" height="10" patternUnits="userSpaceOnUse">
+                        <circle cx="5" cy="5" r="0.5" fill="#334155" />
+                      </pattern>
+
+                      {/* Gradientes Radiales Dinámicos para el Mapa de Calor (Heatmap) */}
+                      {camasCroquisSVG.map(c => {
+                        const colorPlaga = c.severidad > 0.7 ? "#ef4444" : c.severidad > 0.4 ? "#eab308" : "#10b981";
+                        return (
+                          <radialGradient key={`grad-${c.id}`} id={`heat-${c.id}`} cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stopColor={colorPlaga} stopOpacity="0.9" />
+                            <stop offset="35%" stopColor={colorPlaga} stopOpacity="0.5" />
+                            <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+                          </radialGradient>
+                        );
+                      })}
+                    </defs>
+
+                    {/* Fondos */}
+                    <rect width="800" height="450" fill="#0b0f19" />
+                    <rect width="800" height="450" fill="url(#blueprintGrid)" />
+                    <rect width="800" height="450" fill="url(#dotGrid)" opacity="0.6" />
+
+                    {/* Estructura Exterior Invernadero */}
+                    <rect x="15" y="15" width="770" height="420" rx="12" fill="none" stroke="#334155" strokeWidth="2.5" strokeDasharray="10 6" />
+                    <text x="30" y="38" fill="#475569" fontSize="10" fontWeight="bold" letterSpacing="1.5">ESTRUCTURA PERIMETRAL - PILARES DE ACERO</text>
+
+                    {/* CAPA 1: TRAZADO GPS DEL MONITOR (Scarab Scout Route) */}
+                    {verRutaMonitor && (
+                      <g id="scouting-route">
+                        {/* Línea de Trayecto (Pasillo) */}
+                        <path 
+                          d="M 40 120 L 760 120 L 760 220 L 40 220 L 40 320 L 760 320" 
+                          fill="none" 
+                          stroke="#06b6d4" 
+                          strokeWidth="2.5" 
+                          strokeDasharray="6 5" 
+                          opacity="0.85" 
+                        />
+                        <text x="45" y="112" fill="#06b6d4" fontSize="8" fontWeight="bold" letterSpacing="0.5">RUTA GPS DEL MONITOR (AUDITADA)</text>
+
+                        {/* Puntos de Registro GPS */}
+                        {[
+                          {x: 100, y: 120, time: "14:32", status: "ok"},
+                          {x: 350, y: 120, time: "14:35", status: "ok"},
+                          {x: 650, y: 120, time: "14:39", status: "ok"},
+                          {x: 760, y: 170, time: "14:41", status: "ok"},
+                          {x: 550, y: 220, time: "14:44", status: "warning", msg: "Araña Detectada"},
+                          {x: 250, y: 220, time: "14:48", status: "ok"},
+                          {x: 40, y: 270, time: "14:52", status: "ok"},
+                          {x: 180, y: 320, time: "14:55", status: "ok"},
+                          {x: 480, y: 320, time: "14:59", status: "ok"}
+                        ].map((pt, i) => {
+                          const haloColor = pt.status === "warning" ? "#ef4444" : "#22d3ee";
+                          return (
+                            <g key={`pt-${i}`} style={{ pointerEvents: "none" }}>
+                              {/* Halo Pulsante */}
+                              <circle cx={pt.x} cy={pt.y} r="8" fill="none" stroke={haloColor} strokeWidth="1.5" className="gps-pulse" />
+                              {/* Núcleo Fijo */}
+                              <circle cx={pt.x} cy={pt.y} r="4" fill={haloColor} className="pulse-core" />
+                            </g>
+                          );
+                        })}
+                      </g>
+                    )}
+
+                    {/* CAPA 2: CAMAS (RECTÁNGULOS) */}
+                    <g id="beds">
+                      {camasCroquisSVG
+                        .filter(c => c.invernaderoId === invernaderoCroquis)
+                        .map((c) => {
+                          // Definir color de siembra
+                          let colorSiembra = "#64748b"; // Gris sin censo
+                          if (c.estado === "Lista Cosecha") colorSiembra = "#10b981";
+                          else if (c.estado === "En Crecimiento") colorSiembra = "#f97316";
+
+                          const esSeleccionada = camaSeleccionadaCroquis?.id === c.id;
+
+                          return (
+                            <g 
+                              key={c.id} 
+                              onClick={() => setCamaSeleccionadaCroquis(c)}
+                              style={{ cursor: "pointer" }}
+                            >
+                              {/* Rectángulo de Cama de Cultivo */}
+                              <rect
+                                x={c.x}
+                                y={c.y}
+                                width={c.w}
+                                height={c.h}
+                                rx="5"
+                                className="bed-rect"
+                                fill={modoVistaCroquis === "siembra" ? colorSiembra : "#1e293b"}
+                                fillOpacity={modoVistaCroquis === "siembra" ? "0.9" : "0.75"}
+                                stroke={esSeleccionada ? "#facc15" : "#334155"}
+                                strokeWidth={esSeleccionada ? "3" : "1.5"}
+                              />
+
+                              {/* Nombre de la Cama */}
+                              <text 
+                                x={c.x + c.w / 2} 
+                                y={c.y + 20} 
+                                fill="#ffffff" 
+                                fontSize="11" 
+                                fontWeight="bold" 
+                                textAnchor="middle"
+                              >
+                                {c.nombre}
+                              </text>
+
+                              {/* Detalle secundario por modo */}
+                              {modoVistaCroquis === "siembra" ? (
+                                <text 
+                                  x={c.x + c.w / 2} 
+                                  y={c.y + 35} 
+                                  fill="#cbd5e1" 
+                                  fontSize="8" 
+                                  textAnchor="middle"
+                                >
+                                  {c.variedad} ({c.largo}m)
+                                </text>
+                              ) : (
+                                <text 
+                                  x={c.x + c.w / 2} 
+                                  y={c.y + 35} 
+                                  fill={c.severidad > 0 ? "#f87171" : "#4ade80"} 
+                                  fontSize="8" 
+                                  fontWeight="bold" 
+                                  textAnchor="middle"
+                                >
+                                  {c.plaga !== "Ninguna" ? `${c.plaga} (${(c.severidad*100).toFixed(0)}%)` : "Sano"}
+                                </text>
+                              )}
+                            </g>
+                          );
+                        })}
+                    </g>
+
+                    {/* CAPA 3: OVERLAY DE MAPA DE CALOR (HEATMAP PLAGAS) */}
+                    {modoVistaCroquis === "calor" && (
+                      <g id="heatmap-layer" style={{ pointerEvents: "none" }}>
+                        {camasCroquisSVG
+                          .filter(c => c.invernaderoId === invernaderoCroquis && c.severidad > 0)
+                          .map((c) => {
+                            // Círculo translúcido de gradiente de calor
+                            const radioCalor = c.severidad * 90;
+                            return (
+                              <circle 
+                                key={`heat-${c.id}`}
+                                cx={c.x + c.w / 2} 
+                                cy={c.y + c.h / 2} 
+                                r={radioCalor} 
+                                fill={`url(#heat-${c.id})`}
+                                opacity="0.8"
+                              />
+                            );
+                          })}
+                      </g>
+                    )}
+
+                  </svg>
+                </div>
+
+                {/* Leyendas y Ayuda Visual Inferior */}
+                <div style={{ marginTop: "15px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", fontSize: "0.8rem", color: "#94a3b8", background: "#1e293b", padding: "10px 15px", borderRadius: "8px" }}>
+                  <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
+                    {modoVistaCroquis === "siembra" ? (
+                      <>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <div style={{ width: "12px", height: "12px", background: "#10b981", borderRadius: "3px" }}></div>
+                          <span>Listo Cosecha</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <div style={{ width: "12px", height: "12px", background: "#f97316", borderRadius: "3px" }}></div>
+                          <span>En Crecimiento</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <div style={{ width: "12px", height: "12px", background: "#64748b", borderRadius: "3px" }}></div>
+                          <span>Sin Censo</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <div style={{ width: "12px", height: "12px", background: "#ef4444", borderRadius: "50%", boxShadow: "0 0 6px #ef4444" }}></div>
+                          <span>Crítico (Plaga &gt;70%)</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <div style={{ width: "12px", height: "12px", background: "#eab308", borderRadius: "50%", boxShadow: "0 0 6px #eab308" }}></div>
+                          <span>Advertencia (40%-70%)</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <div style={{ width: "12px", height: "12px", background: "#10b981", borderRadius: "50%", boxShadow: "0 0 6px #10b981" }}></div>
+                          <span>Bajo (&lt;40%)</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div style={{ fontStyle: "italic" }}>
+                    * Haz clic en una cama para abrir el editor
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
           </div>
         )}
 

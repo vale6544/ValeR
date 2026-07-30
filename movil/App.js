@@ -19,7 +19,7 @@ import CamaraGuiada from './CamaraGuiada';
 
 const DEFAULT_API = Platform.OS === 'web'
   ? 'http://127.0.0.1:8000'
-  : (process.env.EXPO_PUBLIC_API_URL || 'http://192.168.137.1:8000');
+  : (process.env.EXPO_PUBLIC_API_URL || 'https://valer-a2bs.onrender.com');
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('captura'); // 'captura' o 'proyeccion'

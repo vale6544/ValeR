@@ -20,7 +20,7 @@ import Cosecha from "./pages/Cosecha";
 
 
 
-const API = "http://127.0.0.1:8000";
+const API = import.meta.env.VITE_API_URL ||"http://127.0.0.1:8000";
 
 const TITULOS = {
   configuracion: "Configuración de Camas",
@@ -62,19 +62,31 @@ export default function App() {
     const TIEMPO_MINIMO = 2000;
     const inicio = Date.now();
 
-    Promise.all([
-      axios.get(`${API}/camas/`),
-      axios.get(`${API}/reportes/fechas-disponibles`),
-    ])
-      .then(([c, f]) => {
+    // Cargar camas independientemente
+    axios.get(`${API}/camas/`)
+      .then((c) => {
         setCamas(c.data);
+      })
+      .catch((err) => {
+        console.error("Error cargando camas:", err);
+      });
+
+    // Cargar fechas de forma independiente con fallback para el dia de hoy
+    axios.get(`${API}/reportes/fechas-disponibles`)
+      .then((f) => {
         let fs = [...f.data.fechas];
         const hoyEC = getFechaEcuador();
-        const hoyEC_format = hoyEC.split("-").reverse().join("-"); // DD-MM-YYYY
+        const hoyEC_format = hoyEC.split("-").reverse().join("-");
         if (!fs.includes(hoyEC_format)) {
           fs = [hoyEC_format, ...fs];
         }
         setFechas(fs);
+        setFechaSeleccionada(hoyEC);
+      })
+      .catch((err) => {
+        console.error("Error cargando fechas disponibles:", err);
+        const hoyEC = getFechaEcuador();
+        setFechas([hoyEC.split("-").reverse().join("-")]);
         setFechaSeleccionada(hoyEC);
       })
       .finally(() => {
