@@ -75,28 +75,36 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
   const [verRutaMonitor, setVerRutaMonitor] = useState(true);
   const [camaEditando, setCamaEditando] = useState(null);
   
-  // Base de datos local de camas con coordenadas espaciales X, Y y severidad de plagas
+  // Base de datos local de camas con coordenadas espaciales X, Y y puntos de plagas internos
   const [camasCroquisSVG, setCamasCroquisSVG] = useState([
-    // Invernadero 1: Galpón Norte (Rosas Freedom)
-    { id: 1, invernaderoId: 1, nombre: "Cama 1-1", x: 60, y: 60, w: 140, h: 45, largo: 60, ancho: 1.2, estado: "Lista Cosecha", plaga: "Araña Roja", severidad: 0.8, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 150, totalBotones: 130, confianza: 95 },
-    { id: 2, invernaderoId: 1, nombre: "Cama 1-2", x: 230, y: 60, w: 140, h: 45, largo: 60, ancho: 1.2, estado: "En Crecimiento", plaga: "Ninguna", severidad: 0.0, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 110, totalBotones: 95, confianza: 93 },
-    { id: 3, invernaderoId: 1, nombre: "Cama 1-3", x: 400, y: 60, w: 140, h: 45, largo: 60, ancho: 1.2, estado: "Sin censo", plaga: "Ninguna", severidad: 0.0, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 0, totalBotones: 0, confianza: 0 },
-    { id: 4, invernaderoId: 1, nombre: "Cama 1-4", x: 570, y: 60, w: 140, h: 45, largo: 60, ancho: 1.2, estado: "Lista Cosecha", plaga: "Trips", severidad: 0.5, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 145, totalBotones: 120, confianza: 92 },
-    { id: 5, invernaderoId: 1, nombre: "Cama 2-1", x: 60, y: 160, w: 140, h: 45, largo: 55, ancho: 1.2, estado: "En Crecimiento", plaga: "Ninguna", severidad: 0.0, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 98, totalBotones: 85, confianza: 94 },
-    { id: 6, invernaderoId: 1, nombre: "Cama 2-2", x: 230, y: 160, w: 140, h: 45, largo: 55, ancho: 1.2, estado: "Lista Cosecha", plaga: "Botrytis", severidad: 0.9, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 160, totalBotones: 140, confianza: 96 },
-    { id: 7, invernaderoId: 1, nombre: "Cama 2-3", x: 400, y: 160, w: 140, h: 45, largo: 55, ancho: 1.2, estado: "Sin censo", plaga: "Ninguna", severidad: 0.0, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 0, totalBotones: 0, confianza: 0 },
-    { id: 8, invernaderoId: 1, nombre: "Cama 2-4", x: 570, y: 160, w: 140, h: 45, largo: 55, ancho: 1.2, estado: "En Crecimiento", plaga: "Ninguna", severidad: 0.0, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 105, totalBotones: 90, confianza: 93 },
-    { id: 9, invernaderoId: 1, nombre: "Cama 3-1", x: 60, y: 260, w: 140, h: 45, largo: 50, ancho: 1.2, estado: "Lista Cosecha", plaga: "Ninguna", severidad: 0.0, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 130, totalBotones: 110, confianza: 95 },
-    { id: 10, invernaderoId: 1, nombre: "Cama 3-2", x: 230, y: 260, w: 140, h: 45, largo: 50, ancho: 1.2, estado: "Sin censo", plaga: "Ninguna", severidad: 0.0, responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 0, totalBotones: 0, confianza: 0 },
-    { id: 11, invernaderoId: 1, nombre: "Cama 3-3", x: 400, y: 260, w: 140, h: 45, largo: 50, ancho: 1.2, estado: "En Crecimiento", plaga: "Trips", severidad: 0.3, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 88, totalBotones: 75, confianza: 94 },
-    { id: 12, invernaderoId: 1, nombre: "Cama 3-4", x: 570, y: 260, w: 140, h: 45, largo: 50, ancho: 1.2, estado: "Lista Cosecha", plaga: "Ninguna", severidad: 0.0, responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 155, totalBotones: 135, confianza: 96 },
+    // Invernadero 1: Galpón Norte (Rosas Freedom) - Bloque Izquierdo Escalonado
+    { id: 1, invernaderoId: 1, nombre: "Cama 1", x: 60, y: 70, w: 150, h: 30, largo: 60, ancho: 1.2, estado: "Lista Cosecha", responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 150, totalBotones: 130, confianza: 95, puntosPlaga: [{ id: 101, xPct: 15, yPct: 50, severidad: 0.8, plaga: "Araña Roja" }] },
+    { id: 2, invernaderoId: 1, nombre: "Cama 2", x: 70, y: 115, w: 150, h: 30, largo: 60, ancho: 1.2, estado: "En Crecimiento", responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 110, totalBotones: 95, confianza: 93, puntosPlaga: [] },
+    { id: 3, invernaderoId: 1, nombre: "Cama 3", x: 80, y: 160, w: 150, h: 30, largo: 60, ancho: 1.2, estado: "Sin censo", responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 0, totalBotones: 0, confianza: 0, puntosPlaga: [] },
+    { id: 4, invernaderoId: 1, nombre: "Cama 4", x: 90, y: 205, w: 150, h: 30, largo: 60, ancho: 1.2, estado: "Lista Cosecha", responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 145, totalBotones: 120, confianza: 92, puntosPlaga: [{ id: 102, xPct: 75, yPct: 50, severidad: 0.5, plaga: "Trips" }] },
+    { id: 5, invernaderoId: 1, nombre: "Cama 5", x: 100, y: 250, w: 150, h: 30, largo: 55, ancho: 1.2, estado: "En Crecimiento", responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 98, totalBotones: 85, confianza: 94, puntosPlaga: [] },
+    { id: 6, invernaderoId: 1, nombre: "Cama 6", x: 110, y: 295, w: 150, h: 30, largo: 55, ancho: 1.2, estado: "Lista Cosecha", responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 160, totalBotones: 140, confianza: 96, puntosPlaga: [{ id: 103, xPct: 30, yPct: 50, severidad: 0.9, plaga: "Botrytis" }] },
+    
+    // Invernadero 1: Galpón Norte (Rosas Freedom) - Bloque Central
+    { id: 7, invernaderoId: 1, nombre: "Cama 7", x: 280, y: 70, w: 180, h: 30, largo: 55, ancho: 1.2, estado: "Sin censo", responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 0, totalBotones: 0, confianza: 0, puntosPlaga: [] },
+    { id: 8, invernaderoId: 1, nombre: "Cama 8", x: 280, y: 115, w: 180, h: 30, largo: 55, ancho: 1.2, estado: "En Crecimiento", responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 105, totalBotones: 90, confianza: 93, puntosPlaga: [] },
+    { id: 9, invernaderoId: 1, nombre: "Cama 9", x: 280, y: 160, w: 180, h: 30, largo: 50, ancho: 1.2, estado: "Lista Cosecha", responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 130, totalBotones: 110, confianza: 95, puntosPlaga: [{ id: 104, xPct: 45, yPct: 50, severidad: 0.6, plaga: "Trips" }] },
+    { id: 10, invernaderoId: 1, nombre: "Cama 10", x: 280, y: 205, w: 180, h: 30, largo: 50, ancho: 1.2, estado: "Sin censo", responsable: "Luis Silva", variedad: "Rosas Freedom", totalTallos: 0, totalBotones: 0, confianza: 0, puntosPlaga: [] },
+    { id: 11, invernaderoId: 1, nombre: "Cama 11", x: 280, y: 250, w: 180, h: 30, largo: 50, ancho: 1.2, estado: "En Crecimiento", responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 88, totalBotones: 75, confianza: 94, puntosPlaga: [{ id: 105, xPct: 80, yPct: 50, severidad: 0.4, plaga: "Araña Roja" }] },
+    { id: 12, invernaderoId: 1, nombre: "Cama 12", x: 280, y: 295, w: 180, h: 30, largo: 50, ancho: 1.2, estado: "Lista Cosecha", responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 155, totalBotones: 135, confianza: 96, puntosPlaga: [] },
+
+    // Invernadero 1: Galpón Norte (Rosas Freedom) - Bloque Derecho
+    { id: 13, invernaderoId: 1, nombre: "Cama 13", x: 500, y: 70, w: 200, h: 30, largo: 40, ancho: 1.2, estado: "Lista Cosecha", responsable: "Ana Torres", variedad: "Rosas Freedom", totalTallos: 120, totalBotones: 102, confianza: 94, puntosPlaga: [{ id: 106, xPct: 10, yPct: 50, severidad: 0.75, plaga: "Araña Roja" }] },
+    { id: 14, invernaderoId: 1, nombre: "Cama 14", x: 500, y: 115, w: 200, h: 30, largo: 40, ancho: 1.2, estado: "En Crecimiento", responsable: "Ana Torres", variedad: "Rosas Freedom", totalTallos: 85, totalBotones: 72, confianza: 92, puntosPlaga: [] },
+    { id: 15, invernaderoId: 1, nombre: "Cama 15", x: 500, y: 160, w: 200, h: 30, largo: 35, ancho: 1.1, estado: "Sin censo", responsable: "Miguel Rojas", variedad: "Rosas Freedom", totalTallos: 0, totalBotones: 0, confianza: 0, puntosPlaga: [] },
+    { id: 16, invernaderoId: 1, nombre: "Cama 16", x: 500, y: 205, w: 200, h: 30, largo: 40, ancho: 1.2, estado: "Lista Cosecha", responsable: "Ana Torres", variedad: "Rosas Freedom", totalTallos: 130, totalBotones: 112, confianza: 95, puntosPlaga: [{ id: 107, xPct: 90, yPct: 50, severidad: 0.65, plaga: "Botrytis" }] },
     
     // Invernadero 2: Galpón Sur (Rosas Explorer)
-    { id: 13, invernaderoId: 2, nombre: "Cama S-1", x: 80, y: 80, w: 150, h: 50, largo: 40, ancho: 1.2, estado: "Lista Cosecha", plaga: "Araña Roja", severidad: 0.75, responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 120, totalBotones: 102, confianza: 94 },
-    { id: 14, invernaderoId: 2, nombre: "S-2 Fila Este", x: 270, y: 80, w: 150, h: 50, largo: 40, ancho: 1.2, estado: "En Crecimiento", plaga: "Ninguna", severidad: 0.0, responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 85, totalBotones: 72, confianza: 92 },
-    { id: 15, invernaderoId: 2, nombre: "S-3 Lateral", x: 460, y: 80, w: 150, h: 50, largo: 35, ancho: 1.1, estado: "Sin censo", plaga: "Ninguna", severidad: 0.0, responsable: "Miguel Rojas", variedad: "Rosas Explorer", totalTallos: 0, totalBotones: 0, confianza: 0 },
-    { id: 16, invernaderoId: 2, nombre: "S-4 Central", x: 80, y: 200, w: 150, h: 50, largo: 40, ancho: 1.2, estado: "Lista Cosecha", plaga: "Botrytis", severidad: 0.4, responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 130, totalBotones: 112, confianza: 95 },
-    { id: 17, invernaderoId: 2, nombre: "S-5 Fila Oeste", x: 270, y: 200, w: 150, h: 50, largo: 40, ancho: 1.2, estado: "En Crecimiento", plaga: "Ninguna", severidad: 0.0, responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 92, totalBotones: 80, confianza: 93 }
+    { id: 17, invernaderoId: 2, nombre: "Cama S-1", x: 80, y: 80, w: 180, h: 35, largo: 40, ancho: 1.2, estado: "Lista Cosecha", responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 120, totalBotones: 102, confianza: 94, puntosPlaga: [{ id: 108, xPct: 30, yPct: 50, severidad: 0.75, plaga: "Araña Roja" }] },
+    { id: 18, invernaderoId: 2, nombre: "Cama S-2", x: 80, y: 130, w: 180, h: 35, largo: 40, ancho: 1.2, estado: "En Crecimiento", responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 85, totalBotones: 72, confianza: 92, puntosPlaga: [] },
+    { id: 19, invernaderoId: 2, nombre: "Cama S-3", x: 80, y: 180, w: 180, h: 35, largo: 35, ancho: 1.1, estado: "Sin censo", responsable: "Miguel Rojas", variedad: "Rosas Explorer", totalTallos: 0, totalBotones: 0, confianza: 0, puntosPlaga: [] },
+    { id: 20, invernaderoId: 2, nombre: "Cama S-4", x: 300, y: 80, w: 200, h: 35, largo: 40, ancho: 1.2, estado: "Lista Cosecha", responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 130, totalBotones: 112, confianza: 95, puntosPlaga: [{ id: 109, xPct: 70, yPct: 50, severidad: 0.5, plaga: "Trips" }] },
+    { id: 21, invernaderoId: 2, nombre: "Cama S-5", x: 300, y: 130, w: 200, h: 35, largo: 40, ancho: 1.2, estado: "En Crecimiento", responsable: "Ana Torres", variedad: "Rosas Explorer", totalTallos: 92, totalBotones: 80, confianza: 93, puntosPlaga: [] }
   ]);
 
   // Control de Roles y Permisos (Mock)
@@ -1665,7 +1673,7 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
         {seccion === "croquis" && (
           <div>
             <h2 style={{ color: "#1a2e1a", marginBottom: "5px" }}>Croquis Interactivo del Invernadero</h2>
-            <p style={{ color: "#666", marginBottom: "25px", marginTop: 0 }}>Distribución espacial, mapa de calor de plagas y auditoría de rutas en tiempo real.</p>
+            <p style={{ color: "#666", marginBottom: "25px", marginTop: 0 }}>Distribución real de camas, mapa de calor localizado y auditoría de rutas.</p>
             
             {/* Panel Principal Contenedor */}
             <div style={{ display: "flex", gap: "25px", flexWrap: "wrap", alignItems: "stretch" }}>
@@ -1674,7 +1682,7 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
               <div style={{ 
                 flex: "1 1 320px", 
                 maxWidth: "400px", 
-                background: "white", 
+                background: "#ffffff", 
                 padding: "20px", 
                 borderRadius: "12px", 
                 boxShadow: "0 4px 12px rgba(0,0,0,0.05)", 
@@ -1686,14 +1694,14 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                 
                 {/* 1. Selector de Invernadero */}
                 <div>
-                  <label style={{ display: "block", marginBottom: "6px", color: "#475569", fontWeight: "700", fontSize: "0.8rem", uppercase: "true", letterSpacing: "0.5px" }}>INVERNADERO ACTIVO</label>
+                  <label style={{ display: "block", marginBottom: "6px", color: "#475569", fontWeight: "700", fontSize: "0.8rem", letterSpacing: "0.5px" }}>INVERNADERO ACTIVO</label>
                   <select 
                     value={invernaderoCroquis} 
                     onChange={(e) => {
                       setInvernaderoCroquis(parseInt(e.target.value));
                       setCamaSeleccionadaCroquis(null);
                     }}
-                    style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f8fafc", fontWeight: "600", fontSize: "0.9rem" }}
+                    style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f8fafc", fontWeight: "600", fontSize: "0.9rem", color: "#1e293b" }}
                   >
                     <option value="1">Galpón Norte (Rosas Freedom)</option>
                     <option value="2">Galpón Sur (Rosas Explorer)</option>
@@ -1722,7 +1730,7 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                         transition: "all 0.2s ease"
                       }}
                     >
-                      🌱 Cultivo
+                      🌱 Distribución
                     </button>
                     <button
                       onClick={() => setModoVistaCroquis("calor")}
@@ -1759,11 +1767,11 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                   </label>
                 </div>
 
-                {/* 3. Editor de Camas Dinámico */}
+                {/* 3. Editor de Camas y Focos de Plagas Dinámico */}
                 <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "15px", flex: 1 }}>
                   {!camaSeleccionadaCroquis ? (
                     <div style={{ background: "#f8fafc", padding: "18px", borderRadius: "8px", border: "1px dashed #cbd5e1", textAlign: "center", color: "#64748b" }}>
-                      <p style={{ margin: "0 0 12px 0", fontSize: "0.85rem" }}>Selecciona una cama en el plano para editar sus dimensiones o registrar incidencias de plaga.</p>
+                      <p style={{ margin: "0 0 12px 0", fontSize: "0.85rem" }}>Selecciona una cama en el plano para editar sus dimensiones reales o añadir focos exactos de plagas.</p>
                       <button
                         onClick={() => {
                           const nuevoId = Math.max(...camasCroquisSVG.map(c => c.id), 0) + 1;
@@ -1771,20 +1779,19 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                             id: nuevoId,
                             invernaderoId: invernaderoCroquis,
                             nombre: `Cama ${camasCroquisSVG.filter(c => c.invernaderoId === invernaderoCroquis).length + 1}`,
-                            x: 100 + (nuevoId * 40) % 500,
-                            y: 100 + (nuevoId * 30) % 200,
-                            w: 140,
-                            h: 45,
+                            x: 100,
+                            y: 100,
+                            w: 160,
+                            h: 30,
                             largo: 50,
                             ancho: 1.2,
                             estado: "Sin censo",
-                            plaga: "Ninguna",
-                            severidad: 0.0,
                             responsable: "Luis Silva",
                             variedad: invernaderoCroquis === 1 ? "Rosas Freedom" : "Rosas Explorer",
                             totalTallos: 0,
                             totalBotones: 0,
-                            confianza: 0
+                            confianza: 0,
+                            puntosPlaga: []
                           };
                           setCamasCroquisSVG(prev => [...prev, nuevaCama]);
                           setCamaSeleccionadaCroquis(nuevaCama);
@@ -1795,26 +1802,26 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                       </button>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "400px", overflowY: "auto", paddingRight: "4px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontWeight: "bold", color: "#1e293b", fontSize: "0.95rem" }}>Propiedades de Cama</span>
+                        <span style={{ fontWeight: "bold", color: "#1e293b", fontSize: "0.95rem" }}>Cama Seleccionada</span>
                         <button 
                           onClick={() => {
-                            if (window.confirm("¿Seguro que deseas eliminar esta cama de la distribución?")) {
+                            if (window.confirm("¿Seguro que deseas eliminar esta cama?")) {
                               setCamasCroquisSVG(prev => prev.filter(c => c.id !== camaSeleccionadaCroquis.id));
                               setCamaSeleccionadaCroquis(null);
                             }
                           }}
                           style={{ border: "none", background: "none", color: "#ef4444", fontSize: "0.8rem", fontWeight: "bold", cursor: "pointer" }}
                         >
-                          🗑️ Eliminar
+                          🗑️ Eliminar Cama
                         </button>
                       </div>
 
-                      {/* Inputs de coordenadas y datos */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                      {/* Propiedades generales */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                         <div>
-                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Nombre</label>
+                          <label style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: "600" }}>Nombre</label>
                           <input
                             type="text"
                             value={camaSeleccionadaCroquis.nombre}
@@ -1823,11 +1830,11 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                               setCamaSeleccionadaCroquis(updated);
                               setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
                             }}
-                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                            style={{ width: "100%", padding: "5px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.8rem" }}
                           />
                         </div>
                         <div>
-                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Variedad</label>
+                          <label style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: "600" }}>Variedad</label>
                           <input
                             type="text"
                             value={camaSeleccionadaCroquis.variedad}
@@ -1836,47 +1843,69 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                               setCamaSeleccionadaCroquis(updated);
                               setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
                             }}
-                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                            style={{ width: "100%", padding: "5px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.8rem" }}
                           />
                         </div>
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                        <div>
-                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Posición X (SVG)</label>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "6px" }}>
+                        <div style={{ gridColumn: "span 1" }}>
+                          <label style={{ fontSize: "0.65rem", color: "#64748b" }}>X (px)</label>
                           <input
                             type="number"
-                            min="0"
-                            max="700"
                             value={camaSeleccionadaCroquis.x}
                             onChange={(e) => {
                               const updated = { ...camaSeleccionadaCroquis, x: parseInt(e.target.value) || 0 };
                               setCamaSeleccionadaCroquis(updated);
                               setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
                             }}
-                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                            style={{ width: "100%", padding: "4px 6px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.75rem" }}
                           />
                         </div>
-                        <div>
-                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Posición Y (SVG)</label>
+                        <div style={{ gridColumn: "span 1" }}>
+                          <label style={{ fontSize: "0.65rem", color: "#64748b" }}>Y (px)</label>
                           <input
                             type="number"
-                            min="0"
-                            max="400"
                             value={camaSeleccionadaCroquis.y}
                             onChange={(e) => {
                               const updated = { ...camaSeleccionadaCroquis, y: parseInt(e.target.value) || 0 };
                               setCamaSeleccionadaCroquis(updated);
                               setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
                             }}
-                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                            style={{ width: "100%", padding: "4px 6px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.75rem" }}
+                          />
+                        </div>
+                        <div style={{ gridColumn: "span 1" }}>
+                          <label style={{ fontSize: "0.65rem", color: "#64748b" }}>Ancho (w)</label>
+                          <input
+                            type="number"
+                            value={camaSeleccionadaCroquis.w}
+                            onChange={(e) => {
+                              const updated = { ...camaSeleccionadaCroquis, w: parseInt(e.target.value) || 20 };
+                              setCamaSeleccionadaCroquis(updated);
+                              setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                            }}
+                            style={{ width: "100%", padding: "4px 6px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.75rem" }}
+                          />
+                        </div>
+                        <div style={{ gridColumn: "span 1" }}>
+                          <label style={{ fontSize: "0.65rem", color: "#64748b" }}>Alto (h)</label>
+                          <input
+                            type="number"
+                            value={camaSeleccionadaCroquis.h}
+                            onChange={(e) => {
+                              const updated = { ...camaSeleccionadaCroquis, h: parseInt(e.target.value) || 10 };
+                              setCamaSeleccionadaCroquis(updated);
+                              setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                            }}
+                            style={{ width: "100%", padding: "4px 6px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.75rem" }}
                           />
                         </div>
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                         <div>
-                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Largo Cama (m)</label>
+                          <label style={{ fontSize: "0.7rem", color: "#64748b" }}>Largo Real (m)</label>
                           <input
                             type="number"
                             value={camaSeleccionadaCroquis.largo}
@@ -1885,11 +1914,11 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                               setCamaSeleccionadaCroquis(updated);
                               setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
                             }}
-                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                            style={{ width: "100%", padding: "5px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.8rem" }}
                           />
                         </div>
                         <div>
-                          <label style={{ fontSize: "0.75rem", color: "#64748b" }}>Estado Censo</label>
+                          <label style={{ fontSize: "0.7rem", color: "#64748b" }}>Estado</label>
                           <select
                             value={camaSeleccionadaCroquis.estado}
                             onChange={(e) => {
@@ -1897,7 +1926,7 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                               setCamaSeleccionadaCroquis(updated);
                               setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
                             }}
-                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.85rem" }}
+                            style={{ width: "100%", padding: "5px 8px", borderRadius: "4px", border: "1px solid #cbd5e1", fontSize: "0.8rem" }}
                           >
                             <option value="Lista Cosecha">Lista Cosecha</option>
                             <option value="En Crecimiento">En Crecimiento</option>
@@ -1906,62 +1935,118 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                         </div>
                       </div>
 
-                      {/* Registro de Incidencias de Plaga */}
+                      {/* --- REGISTRO DE FOCOS DE PLAGAS LOCALIZADOS (Multi-Punto) --- */}
                       <div style={{ background: "#fff5f5", padding: "12px", borderRadius: "8px", border: "1px solid #fed7d7", marginTop: "5px" }}>
-                        <h4 style={{ margin: "0 0 10px 0", color: "#c53030", fontSize: "0.8rem", fontWeight: "bold" }}>🚨 AUDITORÍA DE PLAGAS</h4>
-                        
-                        <div style={{ marginBottom: "8px" }}>
-                          <label style={{ fontSize: "0.7rem", color: "#742a2a", display: "block" }}>Tipo de Plaga</label>
-                          <select
-                            value={camaSeleccionadaCroquis.plaga}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              const updated = { 
-                                ...camaSeleccionadaCroquis, 
-                                plaga: val,
-                                severidad: val === "Ninguna" ? 0.0 : camaSeleccionadaCroquis.severidad || 0.5 
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                          <h4 style={{ margin: 0, color: "#c53030", fontSize: "0.8rem", fontWeight: "bold" }}>🚨 FOCOS DE PLAGA EN CAMA</h4>
+                          <button
+                            onClick={() => {
+                              const nuevosPuntos = [...(camaSeleccionadaCroquis.puntosPlaga || [])];
+                              const nuevoPunto = {
+                                id: Date.now(),
+                                xPct: 50,
+                                yPct: 50,
+                                severidad: 0.5,
+                                plaga: "Araña Roja"
                               };
+                              nuevosPuntos.push(nuevoPunto);
+                              const updated = { ...camaSeleccionadaCroquis, puntosPlaga: nuevosPuntos };
                               setCamaSeleccionadaCroquis(updated);
                               setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
                             }}
-                            style={{ width: "100%", padding: "6px 8px", borderRadius: "4px", border: "1px solid #f5c2c2", fontSize: "0.8rem" }}
+                            style={{ padding: "3px 8px", background: "#e53e3e", color: "white", border: "none", borderRadius: "4px", fontSize: "0.65rem", fontWeight: "bold", cursor: "pointer" }}
                           >
-                            <option value="Ninguna">Sana (Ninguna)</option>
-                            <option value="Araña Roja">Araña Roja</option>
-                            <option value="Trips">Trips</option>
-                            <option value="Botrytis">Botrytis</option>
-                          </select>
+                            + Añadir Foco
+                          </button>
                         </div>
 
-                        {camaSeleccionadaCroquis.plaga !== "Ninguna" && (
-                          <div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "#742a2a", fontWeight: "bold" }}>
-                              <span>Severidad (Heatmap)</span>
-                              <span>{(camaSeleccionadaCroquis.severidad * 100).toFixed(0)}%</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="0.1"
-                              max="1.0"
-                              step="0.05"
-                              value={camaSeleccionadaCroquis.severidad}
-                              onChange={(e) => {
-                                const updated = { ...camaSeleccionadaCroquis, severidad: parseFloat(e.target.value) };
-                                setCamaSeleccionadaCroquis(updated);
-                                setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
-                              }}
-                              style={{ width: "100%", accentColor: "#e53e3e", cursor: "pointer" }}
-                            />
-                            <div style={{ fontSize: "0.65rem", color: "#9b2c2c", textAlign: "center", marginTop: "2px" }}>
-                              {camaSeleccionadaCroquis.severidad > 0.7 ? "🔴 Foco Crítico (Fumigación)" : camaSeleccionadaCroquis.severidad > 0.4 ? "🟡 Alerta Moderada" : "🟢 Alerta Leve"}
-                            </div>
+                        {(!camaSeleccionadaCroquis.puntosPlaga || camaSeleccionadaCroquis.puntosPlaga.length === 0) ? (
+                          <div style={{ fontSize: "0.75rem", color: "#9b2c2c", fontStyle: "italic", textAlign: "center", padding: "10px 0" }}>
+                            Cama sana. Sin plagas detectadas.
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                            {camaSeleccionadaCroquis.puntosPlaga.map((pt, idx) => (
+                              <div key={pt.id} style={{ background: "#ffffff", padding: "10px", borderRadius: "6px", border: "1px solid #feb2b2", position: "relative" }}>
+                                <button
+                                  onClick={() => {
+                                    const nuevosPuntos = (camaSeleccionadaCroquis.puntosPlaga || []).filter(p => p.id !== pt.id);
+                                    const updated = { ...camaSeleccionadaCroquis, puntosPlaga: nuevosPuntos };
+                                    setCamaSeleccionadaCroquis(updated);
+                                    setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                                  }}
+                                  style={{ position: "absolute", top: "5px", right: "5px", background: "none", border: "none", color: "#e53e3e", fontWeight: "bold", cursor: "pointer", fontSize: "0.85rem" }}
+                                >
+                                  ×
+                                </button>
+                                
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                                  <div>
+                                    <label style={{ fontSize: "0.65rem", color: "#742a2a", display: "block" }}>Plaga</label>
+                                    <select
+                                      value={pt.plaga}
+                                      onChange={(e) => {
+                                        const nuevosP = camaSeleccionadaCroquis.puntosPlaga.map(p => p.id === pt.id ? { ...p, plaga: e.target.value } : p);
+                                        const updated = { ...camaSeleccionadaCroquis, puntosPlaga: nuevosP };
+                                        setCamaSeleccionadaCroquis(updated);
+                                        setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                                      }}
+                                      style={{ width: "100%", padding: "3px 4px", borderRadius: "3px", border: "1px solid #f5c2c2", fontSize: "0.7rem" }}
+                                    >
+                                      <option value="Araña Roja">Araña Roja</option>
+                                      <option value="Trips">Trips</option>
+                                      <option value="Botrytis">Botrytis</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label style={{ fontSize: "0.65rem", color: "#742a2a", display: "block" }}>Severidad ({(pt.severidad * 100).toFixed(0)}%)</label>
+                                    <input
+                                      type="range"
+                                      min="0.10"
+                                      max="1.00"
+                                      step="0.05"
+                                      value={pt.severidad}
+                                      onChange={(e) => {
+                                        const nuevosP = camaSeleccionadaCroquis.puntosPlaga.map(p => p.id === pt.id ? { ...p, severidad: parseFloat(e.target.value) } : p);
+                                        const updated = { ...camaSeleccionadaCroquis, puntosPlaga: nuevosP };
+                                        setCamaSeleccionadaCroquis(updated);
+                                        setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                                      }}
+                                      style={{ width: "100%", accentColor: "#e53e3e", cursor: "pointer", height: "14px" }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Slider de ubicación a lo largo de la cama */}
+                                <div>
+                                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.65rem", color: "#742a2a" }}>
+                                    <span>Posición del Foco:</span>
+                                    <strong>{pt.xPct}% del largo</strong>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="5"
+                                    max="95"
+                                    step="1"
+                                    value={pt.xPct}
+                                    onChange={(e) => {
+                                      const nuevosP = camaSeleccionadaCroquis.puntosPlaga.map(p => p.id === pt.id ? { ...p, xPct: parseInt(e.target.value) } : p);
+                                      const updated = { ...camaSeleccionadaCroquis, puntosPlaga: nuevosP };
+                                      setCamaSeleccionadaCroquis(updated);
+                                      setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                                    }}
+                                    style={{ width: "100%", accentColor: "#4a5568", cursor: "pointer", height: "14px" }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
 
                       <button
                         onClick={() => setCamaSeleccionadaCroquis(null)}
-                        style={{ width: "100%", padding: "8px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "6px", fontWeight: "bold", fontSize: "0.8rem", cursor: "pointer" }}
+                        style={{ width: "100%", padding: "8px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "6px", fontWeight: "bold", fontSize: "0.8rem", cursor: "pointer", marginTop: "10px" }}
                       >
                         Cerrar Editor
                       </button>
@@ -1971,13 +2056,13 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
 
               </div>
 
-              {/* VISTA DEL PLANO INTERACTIVO SVG (70% de ancho aproximado) */}
+              {/* VISTA DEL PLANO INTERACTIVO SVG (70% de ancho aproximado - CLARO/BLUEPRINT) */}
               <div style={{ 
                 flex: "2 1 600px", 
-                background: "#0f172a", 
+                background: "#f8fafc", 
                 borderRadius: "12px", 
-                border: "2px solid #334155", 
-                boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
+                border: "2px solid #cbd5e1", 
+                boxShadow: "0 4px 15px rgba(0,0,0,0.05)",
                 padding: "20px",
                 display: "flex",
                 flexDirection: "column",
@@ -1986,20 +2071,20 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
               }}>
                 
                 {/* Cabecera del Plano */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "12px", marginBottom: "15px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "12px", marginBottom: "15px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981" }}></div>
-                    <span style={{ color: "#94a3b8", fontSize: "0.8rem", fontWeight: "bold", letterSpacing: "1px" }}>
-                      VISTA DIGITAL: {invernaderoCroquis === 1 ? "GALPÓN NORTE (FREEDOM)" : "GALPÓN SUR (EXPLORER)"}
+                    <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }}></div>
+                    <span style={{ color: "#334155", fontSize: "0.8rem", fontWeight: "bold", letterSpacing: "1px" }}>
+                      PLANO CARTOGRÁFICO DE FINCA: {invernaderoCroquis === 1 ? "GALPÓN NORTE (FREEDOM)" : "GALPÓN SUR (EXPLORER)"}
                     </span>
                   </div>
                   <span style={{ color: "#64748b", fontSize: "0.75rem" }}>
-                    {camasCroquisSVG.filter(c => c.invernaderoId === invernaderoCroquis).length} Camas Configuradas
+                    {camasCroquisSVG.filter(c => c.invernaderoId === invernaderoCroquis).length} Camas Ubicadas
                   </span>
                 </div>
 
                 {/* Lienzo SVG */}
-                <div style={{ width: "100%", position: "relative", background: "#020617", borderRadius: "8px" }}>
+                <div style={{ width: "100%", position: "relative", background: "#e2e8f0", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
                   <svg 
                     viewBox="0 0 800 450" 
                     width="100%" 
@@ -2026,77 +2111,82 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                           transition: all 0.25s ease;
                         }
                         .bed-rect:hover {
-                          stroke: #facc15 !important;
+                          stroke: #2563eb !important;
                           stroke-width: 2.5px !important;
-                          filter: drop-shadow(0px 0px 8px rgba(255,255,255,0.15));
+                          filter: drop-shadow(0px 0px 8px rgba(37,99,235,0.15));
                         }
                       `}
                     </style>
 
-                    {/* Defs para patrones de cuadrícula y gradientes de calor */}
+                    {/* Defs para patrones de cuadrícula y gradientes de calor localizados */}
                     <defs>
-                      {/* Cuadrícula Blueprint */}
-                      <pattern id="blueprintGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" strokeWidth="1" />
+                      {/* Cuadrícula Blueprint Claro */}
+                      <pattern id="blueprintGridClaro" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#cbd5e1" strokeWidth="1" />
                       </pattern>
-                      <pattern id="dotGrid" width="10" height="10" patternUnits="userSpaceOnUse">
-                        <circle cx="5" cy="5" r="0.5" fill="#334155" />
+                      <pattern id="dotGridClaro" width="10" height="10" patternUnits="userSpaceOnUse">
+                        <circle cx="5" cy="5" r="0.5" fill="#94a3b8" />
                       </pattern>
 
-                      {/* Gradientes Radiales Dinámicos para el Mapa de Calor (Heatmap) */}
-                      {camasCroquisSVG.map(c => {
-                        const colorPlaga = c.severidad > 0.7 ? "#ef4444" : c.severidad > 0.4 ? "#eab308" : "#10b981";
-                        return (
-                          <radialGradient key={`grad-${c.id}`} id={`heat-${c.id}`} cx="50%" cy="50%" r="50%">
-                            <stop offset="0%" stopColor={colorPlaga} stopOpacity="0.9" />
-                            <stop offset="35%" stopColor={colorPlaga} stopOpacity="0.5" />
-                            <stop offset="100%" stopColor="#000000" stopOpacity="0" />
-                          </radialGradient>
-                        );
-                      })}
+                      {/* Gradientes Radiales de Plagas específicos por tipo */}
+                      {camasCroquisSVG
+                        .filter(c => c.invernaderoId === invernaderoCroquis)
+                        .flatMap(c => (c.puntosPlaga || []).map(pt => {
+                          // Colores: Araña Roja = Rojo, Trips = Amarillo, Botrytis = Morado
+                          let colorPest = "#ef4444";
+                          if (pt.plaga === "Trips") colorPest = "#f59e0b";
+                          else if (pt.plaga === "Botrytis") colorPest = "#a855f7";
+
+                          return (
+                            <radialGradient key={`grad-${c.id}-${pt.id}`} id={`heat-${c.id}-${pt.id}`} cx="50%" cy="50%" r="50%">
+                              <stop offset="0%" stopColor={colorPest} stopOpacity="0.85" />
+                              <stop offset="40%" stopColor={colorPest} stopOpacity="0.45" />
+                              <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+                            </radialGradient>
+                          );
+                        }))
+                      }
                     </defs>
 
                     {/* Fondos */}
-                    <rect width="800" height="450" fill="#0b0f19" />
-                    <rect width="800" height="450" fill="url(#blueprintGrid)" />
-                    <rect width="800" height="450" fill="url(#dotGrid)" opacity="0.6" />
+                    <rect width="800" height="450" fill="#f1f5f9" />
+                    <rect width="800" height="450" fill="url(#blueprintGridClaro)" />
+                    <rect width="800" height="450" fill="url(#dotGridClaro)" opacity="0.6" />
 
                     {/* Estructura Exterior Invernadero */}
-                    <rect x="15" y="15" width="770" height="420" rx="12" fill="none" stroke="#334155" strokeWidth="2.5" strokeDasharray="10 6" />
-                    <text x="30" y="38" fill="#475569" fontSize="10" fontWeight="bold" letterSpacing="1.5">ESTRUCTURA PERIMETRAL - PILARES DE ACERO</text>
+                    <rect x="15" y="15" width="770" height="420" rx="12" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeDasharray="10 6" />
+                    <text x="30" y="38" fill="#64748b" fontSize="10" fontWeight="bold" letterSpacing="1.5">ESTRUCTURA DE NAVE PERIMETRAL - PILARES METÁLICOS</text>
 
                     {/* CAPA 1: TRAZADO GPS DEL MONITOR (Scarab Scout Route) */}
                     {verRutaMonitor && (
                       <g id="scouting-route">
                         {/* Línea de Trayecto (Pasillo) */}
                         <path 
-                          d="M 40 120 L 760 120 L 760 220 L 40 220 L 40 320 L 760 320" 
+                          d="M 40 90 L 760 90 L 760 182 L 40 182 L 40 272 L 760 272" 
                           fill="none" 
-                          stroke="#06b6d4" 
+                          stroke="#64748b" 
                           strokeWidth="2.5" 
                           strokeDasharray="6 5" 
-                          opacity="0.85" 
+                          opacity="0.7" 
                         />
-                        <text x="45" y="112" fill="#06b6d4" fontSize="8" fontWeight="bold" letterSpacing="0.5">RUTA GPS DEL MONITOR (AUDITADA)</text>
+                        <text x="45" y="82" fill="#64748b" fontSize="8" fontWeight="bold" letterSpacing="0.5">TRAYECTORIA AUDITADA DEL MONITOR (GPS)</text>
 
                         {/* Puntos de Registro GPS */}
                         {[
-                          {x: 100, y: 120, time: "14:32", status: "ok"},
-                          {x: 350, y: 120, time: "14:35", status: "ok"},
-                          {x: 650, y: 120, time: "14:39", status: "ok"},
-                          {x: 760, y: 170, time: "14:41", status: "ok"},
-                          {x: 550, y: 220, time: "14:44", status: "warning", msg: "Araña Detectada"},
-                          {x: 250, y: 220, time: "14:48", status: "ok"},
-                          {x: 40, y: 270, time: "14:52", status: "ok"},
-                          {x: 180, y: 320, time: "14:55", status: "ok"},
-                          {x: 480, y: 320, time: "14:59", status: "ok"}
+                          {x: 100, y: 90, status: "ok"},
+                          {x: 350, y: 90, status: "ok"},
+                          {x: 650, y: 90, status: "ok"},
+                          {x: 760, y: 135, status: "ok"},
+                          {x: 550, y: 182, status: "warning"},
+                          {x: 250, y: 182, status: "ok"},
+                          {x: 40, y: 227, status: "ok"},
+                          {x: 180, y: 272, status: "ok"},
+                          {x: 480, y: 272, status: "ok"}
                         ].map((pt, i) => {
-                          const haloColor = pt.status === "warning" ? "#ef4444" : "#22d3ee";
+                          const haloColor = pt.status === "warning" ? "#ef4444" : "#3b82f6";
                           return (
                             <g key={`pt-${i}`} style={{ pointerEvents: "none" }}>
-                              {/* Halo Pulsante */}
                               <circle cx={pt.x} cy={pt.y} r="8" fill="none" stroke={haloColor} strokeWidth="1.5" className="gps-pulse" />
-                              {/* Núcleo Fijo */}
                               <circle cx={pt.x} cy={pt.y} r="4" fill={haloColor} className="pulse-core" />
                             </g>
                           );
@@ -2104,15 +2194,15 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                       </g>
                     )}
 
-                    {/* CAPA 2: CAMAS (RECTÁNGULOS) */}
+                    {/* CAPA 2: CAMAS (RECTÁNGULOS BLANCOS) */}
                     <g id="beds">
                       {camasCroquisSVG
                         .filter(c => c.invernaderoId === invernaderoCroquis)
                         .map((c) => {
-                          // Definir color de siembra
-                          let colorSiembra = "#64748b"; // Gris sin censo
-                          if (c.estado === "Lista Cosecha") colorSiembra = "#10b981";
-                          else if (c.estado === "En Crecimiento") colorSiembra = "#f97316";
+                          // Indicar estado con un borde izquierdo coloreado
+                          let colorEstado = "#cbd5e1"; // Gris
+                          if (c.estado === "Lista Cosecha") colorEstado = "#10b981";
+                          else if (c.estado === "En Crecimiento") colorEstado = "#f97316";
 
                           const esSeleccionada = camaSeleccionadaCroquis?.id === c.id;
 
@@ -2122,79 +2212,81 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                               onClick={() => setCamaSeleccionadaCroquis(c)}
                               style={{ cursor: "pointer" }}
                             >
-                              {/* Rectángulo de Cama de Cultivo */}
+                              {/* Rectángulo de Cama de Cultivo (Fondo Blanco) */}
                               <rect
                                 x={c.x}
                                 y={c.y}
                                 width={c.w}
                                 height={c.h}
-                                rx="5"
+                                rx="4"
                                 className="bed-rect"
-                                fill={modoVistaCroquis === "siembra" ? colorSiembra : "#1e293b"}
-                                fillOpacity={modoVistaCroquis === "siembra" ? "0.9" : "0.75"}
-                                stroke={esSeleccionada ? "#facc15" : "#334155"}
+                                fill="#ffffff"
+                                stroke={esSeleccionada ? "#2563eb" : "#94a3b8"}
                                 strokeWidth={esSeleccionada ? "3" : "1.5"}
                               />
 
+                              {/* Barra lateral de estado de siembra (A la izquierda de cada rectángulo) */}
+                              {modoVistaCroquis === "siembra" && (
+                                <rect
+                                  x={c.x}
+                                  y={c.y}
+                                  width="6"
+                                  height={c.h}
+                                  rx="2"
+                                  fill={colorEstado}
+                                />
+                              )}
+
                               {/* Nombre de la Cama */}
                               <text 
-                                x={c.x + c.w / 2} 
-                                y={c.y + 20} 
-                                fill="#ffffff" 
+                                x={c.x + 15} 
+                                y={c.y + 18} 
+                                fill="#1e293b" 
                                 fontSize="11" 
                                 fontWeight="bold" 
-                                textAnchor="middle"
+                                textAnchor="start"
                               >
                                 {c.nombre}
                               </text>
 
-                              {/* Detalle secundario por modo */}
-                              {modoVistaCroquis === "siembra" ? (
-                                <text 
-                                  x={c.x + c.w / 2} 
-                                  y={c.y + 35} 
-                                  fill="#cbd5e1" 
-                                  fontSize="8" 
-                                  textAnchor="middle"
-                                >
-                                  {c.variedad} ({c.largo}m)
-                                </text>
-                              ) : (
-                                <text 
-                                  x={c.x + c.w / 2} 
-                                  y={c.y + 35} 
-                                  fill={c.severidad > 0 ? "#f87171" : "#4ade80"} 
-                                  fontSize="8" 
-                                  fontWeight="bold" 
-                                  textAnchor="middle"
-                                >
-                                  {c.plaga !== "Ninguna" ? `${c.plaga} (${(c.severidad*100).toFixed(0)}%)` : "Sano"}
-                                </text>
-                              )}
+                              {/* Detalle secundario */}
+                              <text 
+                                x={c.x + c.w - 10} 
+                                y={c.y + 18} 
+                                fill="#64748b" 
+                                fontSize="8.5" 
+                                textAnchor="end"
+                              >
+                                {c.largo}m • {c.variedad}
+                              </text>
                             </g>
                           );
                         })}
                     </g>
 
-                    {/* CAPA 3: OVERLAY DE MAPA DE CALOR (HEATMAP PLAGAS) */}
+                    {/* CAPA 3: OVERLAY DE MAPA DE CALOR LOCALIZADO (HEATMAP MULTI-PUNTO) */}
                     {modoVistaCroquis === "calor" && (
                       <g id="heatmap-layer" style={{ pointerEvents: "none" }}>
                         {camasCroquisSVG
-                          .filter(c => c.invernaderoId === invernaderoCroquis && c.severidad > 0)
-                          .map((c) => {
-                            // Círculo translúcido de gradiente de calor
-                            const radioCalor = c.severidad * 90;
+                          .filter(c => c.invernaderoId === invernaderoCroquis && c.puntosPlaga && c.puntosPlaga.length > 0)
+                          .flatMap(c => c.puntosPlaga.map((pt) => {
+                            // Calcular coordenada exacta del punto de infección
+                            const cx = c.x + (pt.xPct / 100) * c.w;
+                            const cy = c.y + (pt.yPct / 100) * c.h;
+                            const radioCalor = pt.severidad * 45; // Radio controlado de hotspot
+
                             return (
                               <circle 
-                                key={`heat-${c.id}`}
-                                cx={c.x + c.w / 2} 
-                                cy={c.y + c.h / 2} 
+                                key={`heat-${c.id}-${pt.id}`}
+                                cx={cx} 
+                                cy={cy} 
                                 r={radioCalor} 
-                                fill={`url(#heat-${c.id})`}
+                                fill={`url(#heat-${c.id}-${pt.id})`}
                                 opacity="0.8"
                               />
                             );
-                          })}
+                          }))
+                        }
                       </g>
                     )}
 
@@ -2202,7 +2294,7 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                 </div>
 
                 {/* Leyendas y Ayuda Visual Inferior */}
-                <div style={{ marginTop: "15px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", fontSize: "0.8rem", color: "#94a3b8", background: "#1e293b", padding: "10px 15px", borderRadius: "8px" }}>
+                <div style={{ marginTop: "15px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", fontSize: "0.8rem", color: "#475569", background: "#f1f5f9", padding: "10px 15px", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
                   <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
                     {modoVistaCroquis === "siembra" ? (
                       <>
@@ -2215,29 +2307,29 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                           <span>En Crecimiento</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <div style={{ width: "12px", height: "12px", background: "#64748b", borderRadius: "3px" }}></div>
+                          <div style={{ width: "12px", height: "12px", background: "#cbd5e1", borderRadius: "3px" }}></div>
                           <span>Sin Censo</span>
                         </div>
                       </>
                     ) : (
                       <>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <div style={{ width: "12px", height: "12px", background: "#ef4444", borderRadius: "50%", boxShadow: "0 0 6px #ef4444" }}></div>
-                          <span>Crítico (Plaga &gt;70%)</span>
+                          <div style={{ width: "10px", height: "10px", background: "#ef4444", borderRadius: "50%", boxShadow: "0 0 4px #ef4444" }}></div>
+                          <span>Araña Roja</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <div style={{ width: "12px", height: "12px", background: "#eab308", borderRadius: "50%", boxShadow: "0 0 6px #eab308" }}></div>
-                          <span>Advertencia (40%-70%)</span>
+                          <div style={{ width: "10px", height: "10px", background: "#f59e0b", borderRadius: "50%", boxShadow: "0 0 4px #f59e0b" }}></div>
+                          <span>Trips</span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <div style={{ width: "12px", height: "12px", background: "#10b981", borderRadius: "50%", boxShadow: "0 0 6px #10b981" }}></div>
-                          <span>Bajo (&lt;40%)</span>
+                          <div style={{ width: "10px", height: "10px", background: "#a855f7", borderRadius: "50%", boxShadow: "0 0 4px #a855f7" }}></div>
+                          <span>Botrytis</span>
                         </div>
                       </>
                     )}
                   </div>
                   <div style={{ fontStyle: "italic" }}>
-                    * Haz clic en una cama para abrir el editor
+                    * Haz clic en una cama para abrir el editor de focos
                   </div>
                 </div>
 
