@@ -74,6 +74,17 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
   const [modoVistaCroquis, setModoVistaCroquis] = useState("siembra"); // "siembra" o "calor"
   const [verRutaMonitor, setVerRutaMonitor] = useState(true);
   const [camaEditando, setCamaEditando] = useState(null);
+
+  // Estados para el Generador Paramétrico de Bloques
+  const [mostrarGenerador, setMostrarGenerador] = useState(false);
+  const [genNumCamas, setGenNumCamas] = useState(8);
+  const [genStartX, setGenStartX] = useState(60);
+  const [genStartY, setGenStartY] = useState(80);
+  const [genWidth, setGenWidth] = useState(160);
+  const [genHeight, setGenHeight] = useState(30);
+  const [genSpacing, setGenSpacing] = useState(15);
+  const [genSlant, setGenSlant] = useState(10);
+  const [genOrientacion, setGenOrientacion] = useState("horizontal");
   
   // Base de datos local de camas con coordenadas espaciales X, Y y puntos de plagas internos
   const [camasCroquisSVG, setCamasCroquisSVG] = useState([
@@ -156,6 +167,92 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
   const [nuevaEspecie, setNuevaEspecie] = useState({ nombre: "", ciclo: "", largo: "", humedad: "" });
   const [frecuenciaCenso, setFrecuenciaCenso] = useState("Diario");
   const [frecuenciaAlertas, setFrecuenciaAlertas] = useState("Inmediato");
+
+  const generarBloqueCamas = () => {
+    const baseId = Math.max(...camasCroquisSVG.map(c => c.id), 0) + 1;
+    const nuevasCamas = [];
+    
+    for (let i = 0; i < genNumCamas; i++) {
+      let x = genStartX;
+      let y = genStartY;
+      
+      if (genOrientacion === "horizontal") {
+        y = genStartY + i * (genHeight + genSpacing);
+        x = genStartX + i * genSlant;
+      } else {
+        x = genStartX + i * (genWidth + genSpacing);
+        y = genStartY + i * genSlant;
+      }
+      
+      nuevasCamas.push({
+        id: baseId + i,
+        invernaderoId: invernaderoCroquis,
+        nombre: `Cama B${invernaderoCroquis}-${i + 1}`,
+        x: x,
+        y: y,
+        w: genWidth,
+        h: genHeight,
+        largo: Math.round(genWidth * 0.3),
+        ancho: 1.2,
+        estado: "Sin censo",
+        responsable: "Operario Auto",
+        variedad: invernaderoCroquis === 1 ? "Rosas Freedom" : "Rosas Explorer",
+        totalTallos: 0,
+        totalBotones: 0,
+        confianza: 0,
+        puntosPlaga: []
+      });
+    }
+    
+    setCamasCroquisSVG(prev => [...prev, ...nuevasCamas]);
+    setMostrarGenerador(false);
+  };
+
+  const handleSvgClick = (e) => {
+    if (modoVistaCroquis !== "calor") return;
+    
+    const svg = e.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    
+    const clickX = ((e.clientX - rect.left) / rect.width) * 800;
+    const clickY = ((e.clientY - rect.top) / rect.height) * 450;
+    
+    let camaCercana = null;
+    let minDistancia = Infinity;
+    
+    camasCroquisSVG
+      .filter(c => c.invernaderoId === invernaderoCroquis)
+      .forEach(c => {
+        const centroX = c.x + c.w / 2;
+        const centroY = c.y + c.h / 2;
+        const dist = Math.hypot(clickX - centroX, clickY - centroY);
+        
+        if (dist < minDistancia) {
+          minDistancia = dist;
+          camaCercana = c;
+        }
+      });
+      
+    if (camaCercana && minDistancia < 150) {
+      const localX = clickX - camaCercana.x;
+      let xPct = Math.round((localX / camaCercana.w) * 100);
+      xPct = Math.max(5, Math.min(95, xPct));
+      
+      const nuevosPuntos = [...(camaCercana.puntosPlaga || [])];
+      const nuevoPunto = {
+        id: Date.now(),
+        xPct: xPct,
+        yPct: 50,
+        severidad: 0.6,
+        plaga: "Araña Roja"
+      };
+      nuevosPuntos.push(nuevoPunto);
+      
+      const updated = { ...camaCercana, puntosPlaga: nuevosPuntos };
+      setCamaSeleccionadaCroquis(updated);
+      setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+    }
+  };
 
   const handleCambiarRol = (nuevoRol) => {
     setRolActual(nuevoRol);
@@ -1708,6 +1805,87 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                   </select>
                 </div>
 
+                {/* Generador Paramétrico de Bloques */}
+                <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "12px" }}>
+                  <button
+                    onClick={() => setMostrarGenerador(!mostrarGenerador)}
+                    style={{
+                      width: "100%",
+                      padding: "8px",
+                      background: "#f1f5f9",
+                      color: "#334155",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "6px",
+                      fontSize: "0.8rem",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center"
+                    }}
+                  >
+                    <span>🔨 Generar Bloque</span>
+                    <span>{mostrarGenerador ? "▲" : "▼"}</span>
+                  </button>
+                  
+                  {mostrarGenerador && (
+                    <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "6px", border: "1px solid #e2e8f0", marginTop: "8px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                      <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748b" }}>Crea un bloque de camas alineado paramétricamente de forma instantánea.</p>
+                      
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                        <div>
+                          <label style={{ fontSize: "0.65rem", color: "#475569" }}>Camas (Nº)</label>
+                          <input type="number" min="1" max="30" value={genNumCamas} onChange={(e) => setGenNumCamas(parseInt(e.target.value) || 1)} style={{ width: "100%", padding: "4px", fontSize: "0.75rem" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "0.65rem", color: "#475569" }}>Orientación</label>
+                          <select value={genOrientacion} onChange={(e) => setGenOrientacion(e.target.value)} style={{ width: "100%", padding: "4px", fontSize: "0.75rem" }}>
+                            <option value="horizontal">Horizontal (Pasillos H)</option>
+                            <option value="vertical">Vertical (Pasillos V)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
+                        <div>
+                          <label style={{ fontSize: "0.65rem", color: "#475569" }}>Origen X</label>
+                          <input type="number" value={genStartX} onChange={(e) => setGenStartX(parseInt(e.target.value) || 0)} style={{ width: "100%", padding: "4px", fontSize: "0.75rem" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "0.65rem", color: "#475569" }}>Origen Y</label>
+                          <input type="number" value={genStartY} onChange={(e) => setGenStartY(parseInt(e.target.value) || 0)} style={{ width: "100%", padding: "4px", fontSize: "0.75rem" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "0.65rem", color: "#475569" }}>Pasillo (px)</label>
+                          <input type="number" value={genSpacing} onChange={(e) => setGenSpacing(parseInt(e.target.value) || 0)} style={{ width: "100%", padding: "4px", fontSize: "0.75rem" }} />
+                        </div>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
+                        <div>
+                          <label style={{ fontSize: "0.65rem", color: "#475569" }}>Largo (w)</label>
+                          <input type="number" value={genWidth} onChange={(e) => setGenWidth(parseInt(e.target.value) || 1)} style={{ width: "100%", padding: "4px", fontSize: "0.75rem" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "0.65rem", color: "#475569" }}>Alto (h)</label>
+                          <input type="number" value={genHeight} onChange={(e) => setGenHeight(parseInt(e.target.value) || 1)} style={{ width: "100%", padding: "4px", fontSize: "0.75rem" }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "0.65rem", color: "#475569" }}>Escalón (px)</label>
+                          <input type="number" value={genSlant} onChange={(e) => setGenSlant(parseInt(e.target.value) || 0)} style={{ width: "100%", padding: "4px", fontSize: "0.75rem" }} />
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={generarBloqueCamas}
+                        style={{ padding: "6px 10px", background: "#2563eb", color: "white", border: "none", borderRadius: "4px", fontSize: "0.75rem", fontWeight: "bold", cursor: "pointer" }}
+                      >
+                        ⚡ Generar Bloque de Camas
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {/* 2. Interruptores de Capas y Modos */}
                 <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "15px" }}>
                   <label style={{ display: "block", marginBottom: "10px", color: "#475569", fontWeight: "700", fontSize: "0.8rem", letterSpacing: "0.5px" }}>CAPAS DEL MAPA</label>
@@ -2037,6 +2215,41 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                                     }}
                                     style={{ width: "100%", accentColor: "#4a5568", cursor: "pointer", height: "14px" }}
                                   />
+                                  
+                                  {/* Mapeo Agronómico por Postes */}
+                                  <div style={{ marginTop: "6px" }}>
+                                    <label style={{ fontSize: "0.6rem", color: "#742a2a", fontWeight: "bold", display: "block", marginBottom: "4px" }}>📍 Mapear por Poste Físico (Estilo Celular):</label>
+                                    <div style={{ display: "flex", gap: "3px", justifyContent: "space-between" }}>
+                                      {[1, 2, 3, 4, 5].map((posteNum) => {
+                                        const targetPct = posteNum * 20 - 10; // Post 1 = 10%, Post 2 = 30%, Post 3 = 50%, Post 4 = 70%, Post 5 = 90%
+                                        const esActivo = Math.abs(pt.xPct - targetPct) <= 10;
+                                        return (
+                                          <button
+                                            key={posteNum}
+                                            onClick={() => {
+                                              const nuevosP = camaSeleccionadaCroquis.puntosPlaga.map(p => p.id === pt.id ? { ...p, xPct: targetPct } : p);
+                                              const updated = { ...camaSeleccionadaCroquis, puntosPlaga: nuevosP };
+                                              setCamaSeleccionadaCroquis(updated);
+                                              setCamasCroquisSVG(prev => prev.map(c => c.id === updated.id ? updated : c));
+                                            }}
+                                            style={{
+                                              flex: 1,
+                                              padding: "3px 0",
+                                              fontSize: "0.6rem",
+                                              fontWeight: "bold",
+                                              background: esActivo ? "#c53030" : "#f7fafc",
+                                              color: esActivo ? "white" : "#4a5568",
+                                              border: "1px solid #cbd5e1",
+                                              borderRadius: "3px",
+                                              cursor: "pointer"
+                                            }}
+                                          >
+                                            P{posteNum}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -2089,7 +2302,8 @@ export default function ConfiguracionFinca({ defaultSection = "configuracion" })
                     viewBox="0 0 800 450" 
                     width="100%" 
                     height="100%"
-                    style={{ display: "block" }}
+                    style={{ display: "block", cursor: modoVistaCroquis === "calor" ? "crosshair" : "default" }}
+                    onClick={handleSvgClick}
                   >
                     <style>
                       {`
