@@ -13,8 +13,6 @@ import {
   Platform,
   Modal
 } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
 import CamaraGuiada from './CamaraGuiada';
 
 const DEFAULT_API = Platform.OS === 'web'
@@ -22,7 +20,7 @@ const DEFAULT_API = Platform.OS === 'web'
   : (process.env.EXPO_PUBLIC_API_URL || 'https://valer-a2bs.onrender.com');
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('captura'); // 'captura' o 'proyeccion'
+  const [activeTab, setActiveTab] = useState('captura'); // 'captura', 'proyeccion', 'cola_offline'
   const [apiUrl, setApiUrl] = useState(DEFAULT_API);
   const [camas, setCamas] = useState([]);
   const [cargandoCamas, setCargandoCamas] = useState(false);
@@ -32,6 +30,9 @@ export default function App() {
   const [videoA, setVideoA] = useState(null);
   const [videoB, setVideoB] = useState(null);
   const [ladoCamaraActivo, setLadoCamaraActivo] = useState(null);
+
+  // Cola de Videos Pendientes (Offline) guardados en el dispositivo con Fecha y Hora
+  const [colaOffline, setColaOffline] = useState([]);
 
   // Obtener URL limpia sin slashes al final
   const cleanApiUrl = apiUrl ? apiUrl.replace(/\/+$/, '') : '';
@@ -49,10 +50,6 @@ export default function App() {
       })
       .catch((err) => {
         console.error(err);
-        Alert.alert(
-          'Error de Conexión',
-          `No se pudo conectar al servidor en ${cleanApiUrl}. Por favor verifica la dirección IP del backend y que tu móvil esté conectado a la misma red.`
-        );
       })
       .finally(() => setCargandoCamas(false));
   };
@@ -88,7 +85,7 @@ export default function App() {
           onPress={() => setMostrarConfigUrl(!mostrarConfigUrl)}
           style={styles.settingsBtn}
         >
-          <Text style={styles.settingsBtnText}> Servidor</Text>
+          <Text style={styles.settingsBtnText}>Servidor</Text>
         </TouchableOpacity>
       </View>
 
@@ -110,7 +107,7 @@ export default function App() {
             </TouchableOpacity>
           </View>
           <Text style={styles.configHint}>
-            Usa la IP de tu computadora en la red Wi-Fi (no uses localhost).
+            Usa la URL de Render o IP local de tu servidor backend.
           </Text>
         </View>
       )}
@@ -127,11 +124,17 @@ export default function App() {
             videoB={videoB}
             setVideoB={setVideoB}
             setLadoCamaraActivo={setLadoCamaraActivo}
+            colaOffline={colaOffline}
+            setColaOffline={setColaOffline}
           />
         ) : activeTab === 'proyeccion' ? (
           <PantallaProyeccion camas={camas} apiUrl={cleanApiUrl} cargandoCamas={cargandoCamas} />
         ) : (
-          <PantallaSanidad camas={camas} apiUrl={cleanApiUrl} cargandoCamas={cargandoCamas} />
+          <PantallaColaOffline
+            colaOffline={colaOffline}
+            setColaOffline={setColaOffline}
+            apiUrl={cleanApiUrl}
+          />
         )}
       </ScrollView>
 
@@ -142,23 +145,25 @@ export default function App() {
           onPress={() => setActiveTab('captura')}
         >
           <Text style={[styles.tabText, activeTab === 'captura' && styles.tabTextActive]}>
-             Captura Cama
+            Captura Cama
           </Text>
         </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.tabItem, activeTab === 'proyeccion' && styles.tabItemActive]}
           onPress={() => setActiveTab('proyeccion')}
         >
           <Text style={[styles.tabText, activeTab === 'proyeccion' && styles.tabTextActive]}>
-             Cosecha
+            Cosecha & Poda
           </Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'sanidad' && styles.tabItemActive]}
-          onPress={() => setActiveTab('sanidad')}
+          style={[styles.tabItem, activeTab === 'cola_offline' && styles.tabItemActive]}
+          onPress={() => setActiveTab('cola_offline')}
         >
-          <Text style={[styles.tabText, activeTab === 'sanidad' && styles.tabTextActive]}>
-             Sanidad
+          <Text style={[styles.tabText, activeTab === 'cola_offline' && styles.tabTextActive]}>
+            Pendientes ({colaOffline.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -167,7 +172,7 @@ export default function App() {
 }
 
 /* ==========================================================================
-   PANTALLA 1: CAPTURA DE VIDEO CONTINUO
+   PANTALLA 1: CAPTURA DE VIDEO Y ENVÍO ASÍNCRONO (FIRE & FORGET) / OFFLINE
    ========================================================================== */
 function PantallaCaptura({
   camas,
@@ -177,7 +182,9 @@ function PantallaCaptura({
   setVideoA,
   videoB,
   setVideoB,
-  setLadoCamaraActivo
+  setLadoCamaraActivo,
+  colaOffline,
+  setColaOffline
 }) {
   const [camaSeleccionada, setCamaSeleccionada] = useState('');
   const [procesando, setProcesando] = useState(false);
@@ -187,7 +194,8 @@ function PantallaCaptura({
     setLadoCamaraActivo(lado);
   };
 
-  const enviarVideos = async () => {
+  // Enviar video al servidor de forma ASÍNCRONA sin esperar el procesamiento de IA
+  const enviarVideosServidor = async () => {
     if (!camaSeleccionada) {
       Alert.alert('Faltan datos', 'Por favor selecciona la cama.');
       return;
@@ -198,13 +206,12 @@ function PantallaCaptura({
     }
 
     setProcesando(true);
-    setProgresoMsg('Subiendo videos al servidor...');
+    setProgresoMsg('Enviando video al servidor...');
 
     try {
       const formData = new FormData();
       formData.append('cama_id', String(camaSeleccionada));
       
-      // En React Native, adjuntamos archivos locales con uri, name y type
       formData.append('video_a', {
         uri: videoA.uri,
         name: videoA.name || 'video_lado_a.mp4',
@@ -217,6 +224,7 @@ function PantallaCaptura({
         type: videoB.mimeType || 'video/mp4',
       });
 
+      // Se realiza la petición de subida
       const response = await fetch(`${apiUrl}/registros/cargar-cama-completa/`, {
         method: 'POST',
         body: formData,
@@ -226,32 +234,75 @@ function PantallaCaptura({
         },
       });
 
-      const resData = await response.json();
-
       if (!response.ok) {
-        throw new Error(resData.detail || 'Error al procesar el análisis continuo.');
+        throw new Error('No se pudo completar la subida al servidor.');
       }
 
+      // Respuesta inmediata (Sin esperar el cálculo largo de la IA)
       Alert.alert(
-        'Éxito!',
-        `El análisis consolidado se procesó correctamente.\nTotal tallos detectados: ${resData.total_tallos}\nEtapa dominante: ${resData.etapa_dominante}`
+        'Video Enviado con Éxito',
+        'El video de la cama fue recibido por el servidor. El procesamiento de IA se realizará en segundo plano y podrás consultar los resultados en la plataforma Web.'
       );
-      // Limpiar formulario
+
+      // Limpiar selección para la siguiente captura
       setVideoA(null);
       setVideoB(null);
+
     } catch (err) {
-      console.error(err);
-      Alert.alert('Error de Procesamiento', err.message || 'Error al conectar con el backend.');
+      console.error("Error al enviar video:", err);
+      Alert.alert(
+        'Sin Conexión / Error de Subida',
+        'No se pudo conectar con el servidor. ¿Deseas guardar este video localmente en la cola offline con fecha y hora?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Guardar en Offline', onPress: guardarOffline }
+        ]
+      );
     } finally {
       setProcesando(false);
       setProgresoMsg('');
     }
   };
 
+  // Guardar video localmente en la cola offline con Fecha y Hora
+  const guardarOffline = () => {
+    if (!camaSeleccionada) {
+      Alert.alert('Faltan datos', 'Por favor selecciona la cama.');
+      return;
+    }
+    if (!videoA || !videoB) {
+      Alert.alert('Faltan videos', 'Es obligatorio seleccionar el video del Lado A y Lado B.');
+      return;
+    }
+
+    const camaObj = camas.find(c => String(c.id) === String(camaSeleccionada));
+    const camaNombre = camaObj ? camaObj.nombre : `Cama ${camaSeleccionada}`;
+    const fechaHora = new Date().toLocaleString();
+
+    const nuevoRegistroOffline = {
+      id: Date.now().toString(),
+      cama_id: camaSeleccionada,
+      cama_nombre: camaNombre,
+      fecha_hora: fechaHora,
+      videoA,
+      videoB
+    };
+
+    setColaOffline(prev => [nuevoRegistroOffline, ...prev]);
+
+    Alert.alert(
+      'Guardado en Cola Offline',
+      `El video fue guardado localmente en el dispositivo.\nCama: ${camaNombre}\nFecha/Hora: ${fechaHora}\n\nPodrás enviarlo cuando tengas conexión desde la pestaña "Pendientes".`
+    );
+
+    setVideoA(null);
+    setVideoB(null);
+  };
+
   return (
     <View style={styles.screen}>
       <Text style={styles.title}>Censo Continuo por Cama</Text>
-      <Text style={styles.subtitle}>Sube el video de ambos lados simultáneamente</Text>
+      <Text style={styles.subtitle}>Graba o selecciona los videos de ambos lados</Text>
 
       {/* Selección de Cama */}
       <View style={styles.card}>
@@ -294,7 +345,6 @@ function PantallaCaptura({
           style={[styles.filePicker, videoA && styles.filePickerSuccess]}
           onPress={() => seleccionarVideo('A')}
         >
-          <Text style={styles.filePickerEmoji}></Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.filePickerTitle}>Video Lado A (Cama izquierda)</Text>
             <Text style={styles.filePickerDesc} numberOfLines={1}>
@@ -308,7 +358,6 @@ function PantallaCaptura({
           style={[styles.filePicker, videoB && styles.filePickerSuccess]}
           onPress={() => seleccionarVideo('B')}
         >
-          <Text style={styles.filePickerEmoji}></Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.filePickerTitle}>Video Lado B (Cama derecha)</Text>
             <Text style={styles.filePickerDesc} numberOfLines={1}>
@@ -318,24 +367,32 @@ function PantallaCaptura({
         </TouchableOpacity>
       </View>
 
-      {/* Botón de Procesar */}
+      {/* Botones de Envío / Guardado Offline */}
       {procesando ? (
         <View style={styles.processingContainer}>
           <ActivityIndicator size="large" color="#2d5a27" />
           <Text style={styles.processingText}>{progresoMsg}</Text>
-          <Text style={styles.processingHint}>El análisis con Vision AI puede tardar unos minutos.</Text>
         </View>
       ) : (
-        <TouchableOpacity style={styles.submitBtn} onPress={enviarVideos}>
-          <Text style={styles.submitBtnText}> Procesar Cama Completa</Text>
-        </TouchableOpacity>
+        <View style={{ gap: 10 }}>
+          <TouchableOpacity style={styles.submitBtn} onPress={enviarVideosServidor}>
+            <Text style={styles.submitBtnText}>Enviar Video al Servidor</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.submitBtn, { backgroundColor: '#718096' }]}
+            onPress={guardarOffline}
+          >
+            <Text style={styles.submitBtnText}>Guardar para envío posterior (Offline)</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
 }
 
 /* ==========================================================================
-   PANTALLA 2: PROYECCIÓN VS REAL COSECHA
+   PANTALLA 2: REGISTRO SEPARADO DE COSECHA Y PODA TÉCNICA
    ========================================================================== */
 function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
   const [camaSeleccionada, setCamaSeleccionada] = useState('');
@@ -446,8 +503,8 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
 
   return (
     <View style={styles.screen}>
-      <Text style={styles.title}>Proyecciones vs Cosecha Real</Text>
-      <Text style={styles.subtitle}>Compara y registra el corte real del día</Text>
+      <Text style={styles.title}>Cosecha & Poda Técnica</Text>
+      <Text style={styles.subtitle}>Compara la proyección y registra el corte real</Text>
 
       {/* Selector de Cama */}
       <View style={styles.card}>
@@ -492,9 +549,6 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
               {proyeccionHoy !== null ? `${proyeccionHoy} rosas` : 'Sin datos'}
             </Text>
           )}
-          <Text style={styles.projectionNote}>
-            Calculado en base al último censo de visión artificial.
-          </Text>
         </View>
       ) : null}
 
@@ -566,383 +620,152 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
   );
 }
 
-      {/* Registrar Cosecha Button */}
-      {guardando ? (
-        <ActivityIndicator color="#2d5a27" style={{ marginVertical: 15 }} />
+/* ==========================================================================
+   PANTALLA 3: COLA DE VIDEOS PENDIENTES (OFFLINE)
+   ========================================================================== */
+function PantallaColaOffline({ colaOffline, setColaOffline, apiUrl }) {
+  const [enviandoId, setEnviandoId] = useState(null);
+
+  const procesarEnvioItem = async (item) => {
+    setEnviandoId(item.id);
+
+    try {
+      const formData = new FormData();
+      formData.append('cama_id', String(item.cama_id));
+      
+      formData.append('video_a', {
+        uri: item.videoA.uri,
+        name: item.videoA.name || 'video_lado_a.mp4',
+        type: item.videoA.mimeType || 'video/mp4',
+      });
+
+      formData.append('video_b', {
+        uri: item.videoB.uri,
+        name: item.videoB.name || 'video_lado_b.mp4',
+        type: item.videoB.mimeType || 'video/mp4',
+      });
+
+      const response = await fetch(`${apiUrl}/registros/cargar-cama-completa/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al conectar con el servidor.');
+      }
+
+      Alert.alert(
+        'Video Enviado con Éxito',
+        `El video de ${item.cama_nombre} grabado el ${item.fecha_hora} fue subido al servidor. Los resultados se procesarán para la Web.`
+      );
+
+      // Eliminar de la cola tras envío exitoso
+      setColaOffline(prev => prev.filter(i => i.id !== item.id));
+
+    } catch (err) {
+      Alert.alert('Error de Envío', 'Asegúrate de estar conectado a Internet para procesar el video.');
+    } finally {
+      setEnviandoId(null);
+    }
+  };
+
+  const eliminarItemOffline = (id) => {
+    setColaOffline(prev => prev.filter(i => i.id !== id));
+  };
+
+  return (
+    <View style={styles.screen}>
+      <Text style={styles.title}>Videos Pendientes (Cola Offline)</Text>
+      <Text style={styles.subtitle}>Videos guardados localmente en el dispositivo con fecha y hora</Text>
+
+      {colaOffline.length === 0 ? (
+        <View style={styles.card}>
+          <Text style={{ textAlign: 'center', color: '#718096', marginVertical: 20 }}>
+            No tienes videos offline pendientes por enviar.
+          </Text>
+        </View>
       ) : (
-        <TouchableOpacity style={[styles.submitBtn, styles.saveBtn]} onPress={registrarCosecha}>
-          <Text style={styles.submitBtnText}> Registrar Cosecha / Poda</Text>
-        </TouchableOpacity>
+        colaOffline.map((item) => (
+          <View key={item.id} style={styles.card}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#2d5a27' }}>
+              {item.cama_nombre}
+            </Text>
+            <Text style={{ fontSize: 12, color: '#718096', marginVertical: 4 }}>
+              Fecha y Hora de Grabación: {item.fecha_hora}
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+              <TouchableOpacity
+                disabled={enviandoId === item.id}
+                style={[styles.submitBtn, { flex: 1 }]}
+                onPress={() => procesarEnvioItem(item)}
+              >
+                {enviandoId === item.id ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.submitBtnText}>Enviar a Procesar</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.submitBtn, { backgroundColor: '#e53e3e', width: 90 }]}
+                onPress={() => eliminarItemOffline(item.id)}
+              >
+                <Text style={styles.submitBtnText}>Eliminar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))
       )}
     </View>
   );
 }
 
 /* ==========================================================================
-   PANTALLA 3: REPORTE DE SANIDAD Y PLAGAS
+   ESTILOS
    ========================================================================== */
-function PantallaSanidad({ camas, apiUrl, cargandoCamas }) {
-  const [camaSeleccionada, setCamaSeleccionada] = useState('');
-  const [plagaSeleccionada, setPlagaSeleccionada] = useState('');
-  const [severidad, setSeveridad] = useState(''); // 'Bajo', 'Medio', 'Alto'
-  const [fotoEvidencia, setFotoEvidencia] = useState(null);
-  const [observaciones, setObservaciones] = useState('');
-  const [enviando, setEnviando] = useState(false);
-
-  // Estados de la guía de plagas
-  const [mostrarGuia, setMostrarGuia] = useState(false);
-  const [cardGiradaId, setCardGiradaId] = useState(null);
-
-  const plagasOpciones = [
-    { key: 'trips', label: 'Trips (Frankliniella)' },
-    { key: 'acaros', label: 'Ácaros (Arañita roja)' },
-    { key: 'pulgon', label: 'Pulgón verde' },
-    { key: 'minador', label: 'Minador de la hoja' },
-    { key: 'botrytis', label: 'Botrytis (Moho gris)' },
-    { key: 'otro', label: 'Otro / Desconocido' }
-  ];
-
-  const plagasGuia = [
-    {
-      id: 1,
-      nombre: "Trips (Frankliniella)",
-      emoji: "🪲",
-      sintoma: "Insecto de tamaño diminuto que deforma los botones florales y deja listas/marcas blancas en los pétalos.",
-      clima: "Peligro: 23°C - 28°C | Humedad 70% - 80%"
-    },
-    {
-      id: 2,
-      nombre: "Araña Roja (Tetranychus)",
-      emoji: "🕷️",
-      sintoma: "Produce punteado blanco-amarillento en las hojas y telas de araña finas en el envés. Causa defoliación severa.",
-      clima: "Peligro: Altas temperaturas, sequedad y baja humedad."
-    },
-    {
-      id: 3,
-      nombre: "Pulgón Verde (Macrosiphum)",
-      emoji: "🐛",
-      sintoma: "Insecto verde que ataca directamente tallos jóvenes y yemas florales, dejando manchas descoloridas y hundidas.",
-      clima: "Peligro: Ambientes secos sin calor extremo."
-    },
-    {
-      id: 4,
-      nombre: "Minador de la Hoja",
-      emoji: "🍂",
-      sintoma: "Las larvas se alimentan del tejido interno creando galerías o túneles sinuosos blancos a lo largo de las hojas.",
-      clima: "Peligro: Temperaturas moderadas y brotación activa."
-    },
-    {
-      id: 5,
-      nombre: "Botrytis (Moho Gris)",
-      emoji: "🍄",
-      sintoma: "Produce vello y pudrición de color gris cenizo en pétalos, yemas y hojas debido a la excesiva humedad.",
-      clima: "Peligro: Bajas temperaturas y humedad relativa muy alta."
-    }
-  ];
-
-  const tomarFoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permiso Denegado', 'Se necesita acceso a la cámara para tomar fotos.');
-        return;
-      }
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setFotoEvidencia(result.assets[0]);
-      }
-    } catch (err) {
-      console.log('Error al capturar imagen:', err);
-      Alert.alert('Error', 'No se pudo abrir la cámara.');
-    }
-  };
-
-  const enviarReporte = () => {
-    if (!camaSeleccionada) {
-      Alert.alert('Faltan datos', 'Por favor selecciona la cama.');
-      return;
-    }
-    if (!plagaSeleccionada) {
-      Alert.alert('Faltan datos', 'Por favor selecciona el tipo de plaga/enfermedad.');
-      return;
-    }
-    if (!severidad) {
-      Alert.alert('Faltan datos', 'Por favor selecciona el nivel de severidad.');
-      return;
-    }
-
-    setEnviando(true);
-    setTimeout(() => {
-      setEnviando(false);
-      Alert.alert('Reporte Enviado', 'El reporte de sanidad ha sido notificado al supervisor.');
-      setCamaSeleccionada('');
-      setPlagaSeleccionada('');
-      setSeveridad('');
-      setFotoEvidencia(null);
-      setObservaciones('');
-    }, 1500);
-  };
-
-  return (
-    <View style={styles.screen}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Reporte de Sanidad / Plagas</Text>
-        <Text style={styles.subtitle}>Reporta focos de plagas o enfermedades en campo</Text>
-
-        {/* Seleccionar Cama */}
-        <Text style={styles.label}>Cama Afectada:</Text>
-        {cargandoCamas ? (
-          <ActivityIndicator color="#2d5a27" style={{ marginVertical: 10 }} />
-        ) : (
-          <View style={styles.pickerContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-              {camas.map((c) => (
-                <TouchableOpacity
-                  key={c.id}
-                  style={[
-                    styles.camaChip,
-                    camaSeleccionada === c.id && styles.camaChipSelected,
-                  ]}
-                  onPress={() => setCamaSeleccionada(c.id)}
-                >
-                  <Text
-                    style={[
-                      styles.camaChipText,
-                      camaSeleccionada === c.id && styles.camaChipTextSelected,
-                    ]}
-                  >
-                    {c.nombre}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Seleccionar Plaga */}
-        <Text style={[styles.label, { marginTop: 16 }]}>Tipo de Plaga / Enfermedad:</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 6 }}>
-          {plagasOpciones.map((op) => (
-            <TouchableOpacity
-              key={op.key}
-              style={[
-                styles.camaChip,
-                plagaSeleccionada === op.key && [styles.camaChipSelected, { backgroundColor: '#991b1b', borderColor: '#7f1d1d' }]
-              ]}
-              onPress={() => setPlagaSeleccionada(op.key)}
-            >
-              <Text
-                style={[
-                  styles.camaChipText,
-                  plagaSeleccionada === op.key && { color: 'white' }
-                ]}
-              >
-                {op.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Seleccionar Severidad */}
-        <Text style={[styles.label, { marginTop: 16 }]}>Nivel de Severidad:</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginVertical: 6 }}>
-          <TouchableOpacity
-            style={[
-              { flex: 1, padding: 10, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', borderColor: '#f59e0b', backgroundColor: '#fef3c7' },
-              severidad === 'Bajo' && { borderWidth: 3 }
-            ]}
-            onPress={() => setSeveridad('Bajo')}
-          >
-            <Text style={{ fontWeight: '700', color: '#b45309', fontSize: 13 }}>Bajo</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              { flex: 1, padding: 10, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', borderColor: '#f97316', backgroundColor: '#ffedd5' },
-              severidad === 'Medio' && { borderWidth: 3 }
-            ]}
-            onPress={() => setSeveridad('Medio')}
-          >
-            <Text style={{ fontWeight: '700', color: '#c2410c', fontSize: 13 }}>Medio</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              { flex: 1, padding: 10, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', borderColor: '#ef4444', backgroundColor: '#fee2e2' },
-              severidad === 'Alto' && { borderWidth: 3 }
-            ]}
-            onPress={() => setSeveridad('Alto')}
-          >
-            <Text style={{ fontWeight: '700', color: '#991b1b', fontSize: 13 }}>Alto</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Fotografía de Evidencia */}
-        <Text style={[styles.label, { marginTop: 16 }]}>Fotografía de Evidencia:</Text>
-        <TouchableOpacity
-          style={[styles.filePicker, fotoEvidencia && styles.filePickerSuccess]}
-          onPress={tomarFoto}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.filePickerTitle}>Tomar Foto / Cámara del dispositivo</Text>
-            <Text style={styles.filePickerDesc} numberOfLines={1}>
-              {fotoEvidencia ? 'Foto capturada con éxito' : 'Ninguna imagen capturada'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Observaciones */}
-        <View style={styles.commentContainer}>
-          <Text style={styles.label}>Observaciones / Síntomas:</Text>
-          <TextInput
-            style={styles.textArea}
-            multiline
-            numberOfLines={3}
-            placeholder="Describe detalladamente el daño observado..."
-            value={observaciones}
-            onChangeText={setObservaciones}
-          />
-        </View>
-      </View>
-
-      {/* Botón de Enviar */}
-      {enviando ? (
-        <View style={styles.processingContainer}>
-          <ActivityIndicator size="large" color="#991b1b" />
-          <Text style={[styles.processingText, { color: '#991b1b' }]}>Enviando reporte de sanidad...</Text>
-        </View>
-      ) : (
-        <TouchableOpacity style={[styles.submitBtn, { backgroundColor: '#991b1b' }]} onPress={enviarReporte}>
-          <Text style={styles.submitBtnText}>Emitir Reporte</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Botón Flotante de Sanidad (FAB) */}
-      <TouchableOpacity 
-        style={styles.fabBtn} 
-        onPress={() => {
-          setMostrarGuia(true);
-          setCardGiradaId(null);
-        }}
-      >
-        <Text style={styles.fabBtnText}>?</Text>
-      </TouchableOpacity>
-
-      {/* Modal Desplegable de Fichas de Sanidad */}
-      <Modal
-        visible={mostrarGuia}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setMostrarGuia(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity 
-            style={styles.modalBackdrop} 
-            activeOpacity={1} 
-            onPress={() => setMostrarGuia(false)}
-          />
-          <View style={styles.modalDrawer}>
-            {/* Header del Modal */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalHeaderTitle}>Guía de Identificación</Text>
-              <TouchableOpacity onPress={() => setMostrarGuia(false)}>
-                <Text style={styles.modalCloseText}>Cerrar</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Listado de Plagas */}
-            <ScrollView contentContainerStyle={styles.modalList} showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalHint}>
-                Toca cualquier tarjeta para ver los síntomas y condiciones climáticas de riesgo.
-              </Text>
-
-              {plagasGuia.map((plaga) => {
-                const isFlipped = cardGiradaId === plaga.id;
-                return (
-                  <TouchableOpacity
-                    key={plaga.id}
-                    activeOpacity={0.9}
-                    onPress={() => setCardGiradaId(isFlipped ? null : plaga.id)}
-                    style={[
-                      styles.guiaCard,
-                      isFlipped ? styles.guiaCardBack : styles.guiaCardFront
-                    ]}
-                  >
-                    {isFlipped ? (
-                      <View style={styles.cardContentContainer}>
-                        <Text style={styles.cardBackTitle}>{plaga.nombre}</Text>
-                        <Text style={styles.cardBackSub}>Síntomas:</Text>
-                        <Text style={styles.cardBackText}>{plaga.sintoma}</Text>
-                        <View style={styles.climaBox}>
-                          <Text style={styles.climaText}>{plaga.clima}</Text>
-                        </View>
-                        <Text style={styles.cardFlipHintBack}>Toca para regresar ⟳</Text>
-                      </View>
-                    ) : (
-                      <View style={styles.cardContentContainerCenter}>
-                        <Text style={styles.cardFrontEmoji}>{plaga.emoji}</Text>
-                        <Text style={styles.cardFrontTitle}>{plaga.nombre}</Text>
-                        <Text style={styles.cardFlipHint}>Toca para ver síntomas ⟳</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f4f6f4',
+    backgroundColor: '#f4f7f5',
   },
   header: {
-    height: 56,
     backgroundColor: '#2d5a27',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
+    justifyContent: 'between',
   },
   headerTitle: {
-    color: 'white',
+    color: '#ffffff',
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: 'bold',
+    flex: 1,
   },
   settingsBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    padding: 6,
   },
   settingsBtnText: {
-    color: 'white',
-    fontSize: 13,
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: '600',
   },
   configBox: {
-    padding: 16,
-    backgroundColor: '#e5f0e4',
+    backgroundColor: '#ffffff',
+    padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#cbdcd1',
+    borderBottomColor: '#e2e8f0',
   },
   configLabel: {
-    fontSize: 13,
-    color: '#1a3d16',
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 6,
+    color: '#4a5568',
+    marginBottom: 4,
   },
   configInputRow: {
     flexDirection: 'row',
@@ -950,227 +773,174 @@ const styles = StyleSheet.create({
   },
   configInput: {
     flex: 1,
-    height: 40,
-    backgroundColor: 'white',
-    borderRadius: 6,
-    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#b2cbb1',
-    fontSize: 14,
+    borderColor: '#cbd5e1',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 13,
   },
   reconnectBtn: {
     backgroundColor: '#2d5a27',
+    paddingHorizontal: 12,
     justifyContent: 'center',
-    paddingHorizontal: 16,
     borderRadius: 6,
   },
   reconnectBtnText: {
-    color: 'white',
-    fontWeight: '600',
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
   configHint: {
     fontSize: 11,
-    color: '#5b7659',
-    marginTop: 6,
+    color: '#718096',
+    marginTop: 4,
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 80,
+    paddingBottom: 40,
   },
   screen: {
-    flex: 1,
+    gap: 14,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1a2e1a',
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a3d16',
   },
   subtitle: {
     fontSize: 13,
-    color: '#666',
-    marginTop: 4,
-    marginBottom: 16,
+    color: '#4a5568',
+    marginTop: -8,
   },
   card: {
-    backgroundColor: 'white',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
-    boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
     elevation: 2,
   },
   label: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#2d5a27',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   pickerContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
   },
   camaChip: {
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#f1f5f1',
+    backgroundColor: '#edf2f7',
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#e2eae2',
   },
   camaChipSelected: {
     backgroundColor: '#2d5a27',
-    borderColor: '#2d5a27',
   },
   camaChipText: {
-    fontSize: 14,
-    color: '#4a5568',
+    fontSize: 13,
     fontWeight: '600',
+    color: '#4a5568',
   },
   camaChipTextSelected: {
-    color: 'white',
+    color: '#ffffff',
   },
   filePicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 10,
-    backgroundColor: '#fafafa',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
+    borderWidth: 1,
     borderColor: '#cbd5e1',
-    marginBottom: 12,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    backgroundColor: '#f8fafc',
   },
   filePickerSuccess: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#86efac',
-    borderStyle: 'solid',
-  },
-  filePickerEmoji: {
-    fontSize: 28,
-    marginRight: 12,
+    borderColor: '#48bb78',
+    backgroundColor: '#f0fff4',
   },
   filePickerTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#334155',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2d3748',
   },
   filePickerDesc: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#718096',
     marginTop: 2,
   },
   submitBtn: {
-    height: 48,
-    backgroundColor: '#16a34a',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  saveBtn: {
     backgroundColor: '#2d5a27',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
   },
   submitBtnText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
   processingContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    paddingVertical: 20,
   },
   processingText: {
     marginTop: 10,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#2d5a27',
-  },
-  processingHint: {
-    marginTop: 4,
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-  },
-  projectionCard: {
-    backgroundColor: '#e6f4ea',
-    borderLeftWidth: 5,
-    borderLeftColor: '#34a853',
-  },
-  projectionLabel: {
-    fontSize: 13,
-    color: '#137333',
-    fontWeight: '600',
-  },
-  projectionValue: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#137333',
-    marginVertical: 4,
-  },
-  projectionNote: {
-    fontSize: 11,
-    color: '#137333',
-    opacity: 0.8,
   },
   formRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    justifyContent: 'between',
+    marginBottom: 8,
   },
   formLabel: {
     fontSize: 14,
-    color: '#4a5568',
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#2d3748',
   },
   numericInput: {
-    width: 80,
-    height: 38,
-    backgroundColor: '#f7fafc',
     borderWidth: 1,
-    borderColor: '#cbd5e0',
+    borderColor: '#cbd5e1',
     borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    fontSize: 15,
+    fontWeight: 'bold',
+    width: 90,
     textAlign: 'center',
-    fontSize: 16,
+  },
+  projectionCard: {
+    backgroundColor: '#f0fff4',
+    borderColor: '#c6f6d5',
+    borderWidth: 1,
+  },
+  projectionLabel: {
+    fontSize: 13,
+    color: '#22543d',
     fontWeight: '600',
   },
-  commentContainer: {
-    marginTop: 12,
-  },
-  textArea: {
-    marginTop: 6,
-    height: 60,
-    backgroundColor: '#f7fafc',
-    borderWidth: 1,
-    borderColor: '#cbd5e0',
-    borderRadius: 6,
-    padding: 8,
-    fontSize: 13,
-    textAlignVertical: 'top',
+  projectionValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#276749',
+    marginVertical: 4,
   },
   tabBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 56,
-    backgroundColor: 'white',
     flexDirection: 'row',
+    backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
   },
   tabItem: {
     flex: 1,
+    paddingVertical: 12,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   tabItemActive: {
     borderTopWidth: 3,
@@ -1178,163 +948,11 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 12,
+    fontWeight: '600',
     color: '#718096',
-    fontWeight: '500',
   },
   tabTextActive: {
     color: '#2d5a27',
-    fontWeight: '700',
-  },
-  fabBtn: {
-    position: 'absolute',
-    bottom: 75,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#166534',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 6,
-    zIndex: 9999,
-  },
-  fabBtnText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalDrawer: {
-    backgroundColor: '#f4f6f4',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '80%',
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: '#aac9a0',
-    paddingBottom: 12,
-    marginBottom: 15,
-  },
-  modalHeaderTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#166534',
-  },
-  modalCloseText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#dc2626',
-  },
-  modalList: {
-    paddingBottom: 30,
-  },
-  modalHint: {
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  guiaCard: {
-    width: '100%',
-    minHeight: 150,
-    borderRadius: 12,
-    marginBottom: 15,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  guiaCardFront: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#aac9a0',
-  },
-  guiaCardBack: {
-    backgroundColor: '#2d5a27',
-  },
-  cardContentContainer: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  cardContentContainerCenter: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardFrontEmoji: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  cardFrontTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#166534',
-    textAlign: 'center',
-  },
-  cardBackTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  cardBackSub: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#a7f3d0',
-    marginBottom: 4,
-  },
-  cardBackText: {
-    fontSize: 13,
-    color: 'white',
-    lineHeight: 18,
-    marginBottom: 10,
-  },
-  climaBox: {
-    backgroundColor: '#1e3f1a',
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 8,
-  },
-  climaText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#a7f3d0',
-    textAlign: 'center',
-  },
-  cardFlipHint: {
-    fontSize: 11,
-    color: '#94a3b8',
-    marginTop: 8,
-  },
-  cardFlipHintBack: {
-    fontSize: 11,
-    color: '#a7f3d0',
-    textAlign: 'center',
-    marginTop: 6,
-    opacity: 0.8,
+    fontWeight: 'bold',
   },
 });

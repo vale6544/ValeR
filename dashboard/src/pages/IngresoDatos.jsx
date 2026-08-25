@@ -435,35 +435,45 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
               Historial de Censo Continuo
             </div>
             <div style={{ overflowY: "auto", flex: 1 }}>
-              {historial.length === 0 ? (
-                <div style={{ padding: "20px", color: "#999", textAlign: "center" }}>No hay análisis previos</div>
-              ) : (
-                <table className="tabla" style={{ margin: 0 }}>
-                  <thead>
-                    <tr>
-                      <th>Cama</th>
-                      <th>Fecha</th>
-                      <th>Tallos</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historial.map((h) => (
-                      <tr
-                        key={h.id}
-                        onClick={() => setRegistroActivo(h)}
-                        style={{
-                          cursor: "pointer",
-                          background: registroActivo?.id === h.id ? "#f0fdf4" : "white",
-                        }}
-                      >
-                        <td style={{ fontWeight: "700", color: "#2d5a27" }}>{h.cama_nombre || `Cama ${h.cama_id}`}</td>
-                        <td style={{ fontSize: "0.8rem" }}>{h.fecha}</td>
-                        <td style={{ fontWeight: "700" }}>{h.total_tallos}</td>
+              {(() => {
+                const historialFiltrado = historial.filter(
+                  (h) => !camaGlobal || String(h.cama_id) === String(camaGlobal)
+                );
+                if (historialFiltrado.length === 0) {
+                  return (
+                    <div style={{ padding: "20px", color: "#999", textAlign: "center" }}>
+                      No hay censos previos para esta cama
+                    </div>
+                  );
+                }
+                return (
+                  <table className="tabla" style={{ margin: 0 }}>
+                    <thead>
+                      <tr>
+                        <th>Cama</th>
+                        <th>Fecha</th>
+                        <th>Tallos</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                    </thead>
+                    <tbody>
+                      {historialFiltrado.map((h) => (
+                        <tr
+                          key={h.id}
+                          onClick={() => setRegistroActivo(h)}
+                          style={{
+                            cursor: "pointer",
+                            background: registroActivo?.id === h.id ? "#f0fdf4" : "white",
+                          }}
+                        >
+                          <td style={{ fontWeight: "700", color: "#2d5a27" }}>{h.cama_nombre || `Cama ${h.cama_id}`}</td>
+                          <td style={{ fontSize: "0.8rem" }}>{h.fecha}</td>
+                          <td style={{ fontWeight: "700" }}>{h.total_tallos}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
             </div>
           </div>
         </div>
