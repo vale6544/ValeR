@@ -5,9 +5,8 @@ const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 function RegistroPoda({ camas, camaFiltro, onPodaRegistrada }) {
   const [camaId, setCamaId] = useState(camaFiltro || "");
-  const [largos, setLargos] = useState("");
-  const [medios, setMedios] = useState("");
-  const [cortos, setCortos] = useState("");
+  const [tallos, setTallos] = useState("");
+  const [hizoPoda, setHizoPoda] = useState(false);
   const [obs, setObs] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
@@ -18,28 +17,27 @@ function RegistroPoda({ camas, camaFiltro, onPodaRegistrada }) {
 
   const guardar = () => {
     if (!camaId) return setMensaje({ tipo: "error", texto: "Selecciona una cama" });
-    const total = (parseInt(largos) || 0) + (parseInt(medios) || 0) + (parseInt(cortos) || 0);
-    if (total === 0) return setMensaje({ tipo: "error", texto: "Ingresa al menos un tallo podado" });
+    const total = parseInt(tallos) || 0;
+    if (total === 0) return setMensaje({ tipo: "error", texto: "Ingresa al menos 1 tallo cosechado" });
     
     setGuardando(true);
     axios
       .post(`${API}/podas/`, {
         cama_id: parseInt(camaId),
-        tallos_largos: parseInt(largos) || 0,
-        tallos_medios: parseInt(medios) || 0,
-        tallos_cortos: parseInt(cortos) || 0,
-        observaciones: obs || null,
+        tallos_largos: total,
+        tallos_medios: 0,
+        tallos_cortos: 0,
+        observaciones: `Poda Técnica: ${hizoPoda ? 'SÍ' : 'NO'}. ${obs || ''}`.trim(),
       })
       .then((r) => {
-        setMensaje({ tipo: "ok", texto: `Poda registrada - ${r.data.total_podados} tallos en ${r.data.cama}` });
-        setLargos("");
-        setMedios("");
-        setCortos("");
+        setMensaje({ tipo: "ok", texto: `Cosecha registrada - ${total} tallos en ${r.data.cama}` });
+        setTallos("");
+        setHizoPoda(false);
         setObs("");
         onPodaRegistrada(camaId);
       })
       .catch(() => {
-        setMensaje({ tipo: "error", texto: "Error al guardar la poda" });
+        setMensaje({ tipo: "error", texto: "Error al guardar la cosecha" });
       })
       .finally(() => setGuardando(false));
   };
@@ -63,23 +61,31 @@ function RegistroPoda({ camas, camaFiltro, onPodaRegistrada }) {
             ))}
           </select>
         </div>
-        {[
-          { label: "Tallos largos", val: largos, set: setLargos },
-          { label: "Tallos medios", val: medios, set: setMedios },
-          { label: "Tallos cortos", val: cortos, set: setCortos },
-        ].map((f) => (
-          <div key={f.label}>
-            <div style={{ fontSize: "0.82rem", color: "#666", marginBottom: "4px" }}>{f.label}</div>
-            <input
-              type="number"
-              min="0"
-              value={f.val}
-              onChange={(e) => f.set(e.target.value)}
-              style={{ width: "90px", padding: "8px 10px", borderRadius: "8px", border: "1px solid #aac9a0", fontSize: "0.9rem" }}
-              placeholder="0"
-            />
-          </div>
-        ))}
+
+        <div>
+          <div style={{ fontSize: "0.82rem", color: "#666", marginBottom: "4px" }}>Total Tallos Cosechados</div>
+          <input
+            type="number"
+            min="0"
+            value={tallos}
+            onChange={(e) => setTallos(e.target.value)}
+            style={{ width: "140px", padding: "8px 10px", borderRadius: "8px", border: "1px solid #aac9a0", fontSize: "0.9rem" }}
+            placeholder="0"
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: "0.82rem", color: "#666", marginBottom: "4px" }}>¿Se realizó Poda Técnica?</div>
+          <select
+            value={hizoPoda ? "SI" : "NO"}
+            onChange={(e) => setHizoPoda(e.target.value === "SI")}
+            style={{ padding: "8px 12px", borderRadius: "8px", border: "1px solid #aac9a0", fontSize: "0.9rem", fontWeight: "bold" }}
+          >
+            <option value="NO">No</option>
+            <option value="SI">Sí</option>
+          </select>
+        </div>
+
         <div style={{ flex: 1, minWidth: "150px" }}>
           <div style={{ fontSize: "0.82rem", color: "#666", marginBottom: "4px" }}>Observaciones</div>
           <input
@@ -90,6 +96,7 @@ function RegistroPoda({ camas, camaFiltro, onPodaRegistrada }) {
             placeholder="Opcional"
           />
         </div>
+
         <button
           onClick={guardar}
           disabled={guardando}

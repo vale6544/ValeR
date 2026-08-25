@@ -342,10 +342,9 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
   const [proyeccionHoy, setProyeccionHoy] = useState(null);
   const [cargandoProy, setCargandoProy] = useState(false);
 
-  // Formulario de Cosecha Real
-  const [largos, setLargos] = useState('');
-  const [medios, setMedios] = useState('');
-  const [cortos, setCortos] = useState('');
+  // Formulario de Cosecha Real Simplificado
+  const [tallos, setTallos] = useState('');
+  const [hizoPoda, setHizoPoda] = useState(false);
   const [observaciones, setObservaciones] = useState('');
   const [guardando, setGuardando] = useState(false);
 
@@ -356,7 +355,6 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
       return;
     }
     setCargandoProy(true);
-    // Pedimos la proyección a 14 días para extraer el primer día (hoy)
     fetch(`${apiUrl}/reportes/proyeccion-diaria/${camaSeleccionada}?dias=14`)
       .then((res) => {
         if (!res.ok) throw new Error('Error al obtener proyección');
@@ -364,7 +362,6 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
       })
       .then((data) => {
         if (data.dias && data.dias.length > 0) {
-          // Buscamos el elemento marcado como es_hoy
           const hoy = data.dias.find((d) => d.es_hoy) || data.dias[0];
           setProyeccionHoy(hoy ? hoy.botones_proyectados : 0);
         } else {
@@ -384,12 +381,9 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
       return;
     }
 
-    const tLargos = parseInt(largos) || 0;
-    const tMedios = parseInt(medios) || 0;
-    const tCortos = parseInt(cortos) || 0;
-    const total = tLargos + tMedios + tCortos;
+    const totalTallos = parseInt(tallos) || 0;
 
-    if (total === 0) {
+    if (totalTallos === 0) {
       Alert.alert('Cosecha vacía', 'Debes registrar al menos 1 tallo cosechado.');
       return;
     }
@@ -403,10 +397,10 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
       },
       body: JSON.stringify({
         cama_id: parseInt(camaSeleccionada),
-        tallos_largos: tLargos,
-        tallos_medios: tMedios,
-        tallos_cortos: tCortos,
-        observaciones: observaciones || null,
+        tallos_largos: totalTallos, // Total consolidado
+        tallos_medios: 0,
+        tallos_cortos: 0,
+        observaciones: `Poda Técnica: ${hizoPoda ? 'SÍ' : 'NO'}. ${observaciones || ''}`.trim(),
       }),
     })
       .then(async (res) => {
@@ -414,10 +408,16 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
         if (!res.ok) {
           throw new Error(resData.detail || 'Error al registrar la cosecha.');
         }
-        Alert.alert('Cosecha Registrada', `Se registraron exitosamente ${resData.total_podados} tallos.`);
-        // Reset del formulario
-        setLargos('');
-        setMedios('');
+        Alert.alert('Cosecha Registrada', `Se registraron exitosamente ${totalTallos} tallos cosechados.`);
+        setTallos('');
+        setHizoPoda(false);
+        setObservaciones('');
+      })
+      .catch((err) => {
+        Alert.alert('Error', err.message || 'No se pudo conectar al servidor.');
+      })
+      .finally(() => setGuardando(false));
+  };
         setCortos('');
         setObservaciones('');
       })
@@ -481,49 +481,53 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
         </View>
       ) : null}
 
-      {/* Formulario de Cosecha Real */}
+      {/* Formulario de Cosecha Real Simplificado */}
       <View style={styles.card}>
         <Text style={styles.label}>Corte Real de Hoy (Tallos Cosechados):</Text>
         
-        {/* Largos */}
+        {/* Número Total de Tallos */}
         <View style={styles.formRow}>
-          <Text style={styles.formLabel}>Largos (&gt;60cm):</Text>
+          <Text style={styles.formLabel}>Total de Tallos Cosechados:</Text>
           <TextInput
             style={styles.numericInput}
-            value={largos}
-            onChangeText={setLargos}
+            value={tallos}
+            onChangeText={setTallos}
             keyboardType="numeric"
             placeholder="0"
           />
         </View>
 
-        {/* Medios */}
-        <View style={styles.formRow}>
-          <Text style={styles.formLabel}>Medios (40-60cm):</Text>
-          <TextInput
-            style={styles.numericInput}
-            value={medios}
-            onChangeText={setMedios}
-            keyboardType="numeric"
-            placeholder="0"
-          />
-        </View>
+        {/* Poda Técnica Toggle */}
+        <View style={[styles.formRow, { marginTop: 12, alignItems: 'center' }]}>
+          <Text style={styles.formLabel}>¿Se realizó Poda Técnica?</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              style={[
+                styles.camaChip,
+                hizoPoda && styles.camaChipSelected,
+                { paddingHorizontal: 16, paddingVertical: 6 }
+              ]}
+              onPress={() => setHizoPoda(true)}
+            >
+              <Text style={[styles.camaChipText, hizoPoda && styles.camaChipTextSelected]}>Sí</Text>
+            </TouchableOpacity>
 
-        {/* Cortos */}
-        <View style={styles.formRow}>
-          <Text style={styles.formLabel}>Cortos (&lt;40cm):</Text>
-          <TextInput
-            style={styles.numericInput}
-            value={cortos}
-            onChangeText={setCortos}
-            keyboardType="numeric"
-            placeholder="0"
-          />
+            <TouchableOpacity
+              style={[
+                styles.camaChip,
+                !hizoPoda && styles.camaChipSelected,
+                { paddingHorizontal: 16, paddingVertical: 6 }
+              ]}
+              onPress={() => setHizoPoda(false)}
+            >
+              <Text style={[styles.camaChipText, !hizoPoda && styles.camaChipTextSelected]}>No</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Observaciones */}
         <View style={styles.commentContainer}>
-          <Text style={styles.formLabel}>Observaciones de Cosecha:</Text>
+          <Text style={styles.formLabel}>Observaciones adicionales:</Text>
           <TextInput
             style={styles.textArea}
             value={observaciones}

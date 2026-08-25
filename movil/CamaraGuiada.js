@@ -23,14 +23,18 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
   
   const [useUltraWide, setUseUltraWide] = useState(true);
 
-  // Dispositivos de Cámara y Zoom
+  // Dispositivos de Cámara y Zoom con fallback robusto
   const devices = useCameraDevices();
   const defaultBackDevice = useCameraDevice('back');
-  const ultraWideDevice = devices.find(d => 
-    d.position === 'back' && 
-    d.physicalDevices.includes('ultra-wide-angle-camera')
+  const backDevices = Array.isArray(devices) ? devices.filter(d => d.position === 'back') : [];
+  const ultraWideDevice = backDevices.find(d => 
+    d.physicalDevices && Array.isArray(d.physicalDevices) && d.physicalDevices.includes('ultra-wide-angle-camera')
   );
-  const device = (useUltraWide && ultraWideDevice) ? ultraWideDevice : defaultBackDevice;
+  
+  // Selección segura: si ultraWide existe y está activo, usarlo; de lo contrario usar la trasera estándar
+  const device = (useUltraWide && ultraWideDevice) 
+    ? ultraWideDevice 
+    : (defaultBackDevice || backDevices[0] || (Array.isArray(devices) && devices.length > 0 ? devices[0] : null));
 
   // Permisos de Cámara y Micrófono
   const [hasCameraPermission, setHasCameraPermission] = useState(false);

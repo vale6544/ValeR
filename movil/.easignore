@@ -1,4 +1,9 @@
 node_modules/
+.expo/
 android/
 ios/
-.expo/
+build/
+*.apk
+*.aab
+.git/
+*.tar.gz
