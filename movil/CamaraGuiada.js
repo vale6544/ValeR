@@ -185,12 +185,21 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     );
   }
 
-  // 3. Detectando hardware de cámara
+  // 3. Detectando hardware de cámara (Con opción de selección de archivo en galería)
   if (device == null) {
     return (
       <View style={styles.permissionContainer}>
         <ActivityIndicator size="large" color="#2d5a27" />
-        <Text style={[styles.permissionText, { marginTop: 15 }]}>Detectando hardware de cámara...</Text>
+        <Text style={[styles.permissionTitle, { marginTop: 15 }]}>Inicializando Cámara</Text>
+        <Text style={[styles.permissionText, { marginBottom: 15 }]}>
+          Si la vista en vivo tarda en iniciar, puedes seleccionar un video grabado previamente desde tu galería o archivos.
+        </Text>
+        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#1e3f1a', marginVertical: 6 }]} onPress={abrirGaleria}>
+          <Text style={styles.permissionBtnText}>Seleccionar Video desde Galería</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 6 }]} onPress={onCancel}>
+          <Text style={styles.permissionBtnText}>Cancelar</Text>
+        </TouchableOpacity>
       </View>
     );
   }

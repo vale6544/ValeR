@@ -342,11 +342,13 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
   const [proyeccionHoy, setProyeccionHoy] = useState(null);
   const [cargandoProy, setCargandoProy] = useState(false);
 
-  // Formulario de Cosecha Real Simplificado
+  // Formulario 1: Tallos Cosechados
   const [tallos, setTallos] = useState('');
-  const [hizoPoda, setHizoPoda] = useState(false);
-  const [observaciones, setObservaciones] = useState('');
-  const [guardando, setGuardando] = useState(false);
+  const [guardandoCosecha, setGuardandoCosecha] = useState(false);
+
+  // Formulario 2: Poda Técnica
+  const [hizoPoda, setHizoPoda] = useState(true);
+  const [guardandoPoda, setGuardandoPoda] = useState(false);
 
   // Cargar proyección de hoy de la cama seleccionada
   useEffect(() => {
@@ -375,6 +377,7 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
       .finally(() => setCargandoProy(false));
   }, [camaSeleccionada]);
 
+  // Botón 1: Confirmar Cosecha de Tallos
   const registrarCosecha = () => {
     if (!camaSeleccionada) {
       Alert.alert('Faltan datos', 'Por favor selecciona la cama.');
@@ -382,50 +385,64 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
     }
 
     const totalTallos = parseInt(tallos) || 0;
-
     if (totalTallos === 0) {
-      Alert.alert('Cosecha vacía', 'Debes registrar al menos 1 tallo cosechado.');
+      Alert.alert('Cosecha vacía', 'Debes ingresar el número de tallos cosechados.');
       return;
     }
 
-    setGuardando(true);
-
+    setGuardandoCosecha(true);
     fetch(`${apiUrl}/podas/`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         cama_id: parseInt(camaSeleccionada),
-        tallos_largos: totalTallos, // Total consolidado
+        tallos_largos: totalTallos,
         tallos_medios: 0,
         tallos_cortos: 0,
-        observaciones: `Poda Técnica: ${hizoPoda ? 'SÍ' : 'NO'}. ${observaciones || ''}`.trim(),
+        observaciones: `Cosecha Diaria: ${totalTallos} tallos.`,
       }),
     })
       .then(async (res) => {
         const resData = await res.json();
-        if (!res.ok) {
-          throw new Error(resData.detail || 'Error al registrar la cosecha.');
-        }
+        if (!res.ok) throw new Error(resData.detail || 'Error al registrar la cosecha.');
         Alert.alert('Cosecha Registrada', `Se registraron exitosamente ${totalTallos} tallos cosechados.`);
         setTallos('');
-        setHizoPoda(false);
-        setObservaciones('');
       })
       .catch((err) => {
         Alert.alert('Error', err.message || 'No se pudo conectar al servidor.');
       })
-      .finally(() => setGuardando(false));
+      .finally(() => setGuardandoCosecha(false));
   };
-  //       setCortos('');
-  //       setObservaciones('');
-  //     })
-  //     .catch((err) => {
-  //       Alert.alert('Error', err.message || 'No se pudo conectar al servidor.');
-  //     })
-  //     .finally(() => setGuardando(false));
-  // };
+
+  // Botón 2: Confirmar Poda Técnica
+  const registrarPoda = () => {
+    if (!camaSeleccionada) {
+      Alert.alert('Faltan datos', 'Por favor selecciona la cama.');
+      return;
+    }
+
+    setGuardandoPoda(true);
+    fetch(`${apiUrl}/podas/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cama_id: parseInt(camaSeleccionada),
+        tallos_largos: 0,
+        tallos_medios: 0,
+        tallos_cortos: 0,
+        observaciones: `Poda Técnica: ${hizoPoda ? 'SÍ' : 'NO'}.`,
+      }),
+    })
+      .then(async (res) => {
+        const resData = await res.json();
+        if (!res.ok) throw new Error(resData.detail || 'Error al registrar la poda.');
+        Alert.alert('Poda Registrada', `Se registró la poda técnica como: ${hizoPoda ? 'SÍ' : 'NO'}.`);
+      })
+      .catch((err) => {
+        Alert.alert('Error', err.message || 'No se pudo conectar al servidor.');
+      })
+      .finally(() => setGuardandoPoda(false));
+  };
 
   return (
     <View style={styles.screen}>
@@ -481,13 +498,12 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
         </View>
       ) : null}
 
-      {/* Formulario de Cosecha Real Simplificado */}
+      {/* FORMULARIO 1: REGISTRO DE TALLOS COSECHADOS */}
       <View style={styles.card}>
-        <Text style={styles.label}>Corte Real de Hoy (Tallos Cosechados):</Text>
+        <Text style={styles.label}>Registro de Tallos Cosechados:</Text>
         
-        {/* Número Total de Tallos */}
         <View style={styles.formRow}>
-          <Text style={styles.formLabel}>Total de Tallos Cosechados:</Text>
+          <Text style={styles.formLabel}>Total Tallos:</Text>
           <TextInput
             style={styles.numericInput}
             value={tallos}
@@ -497,15 +513,27 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
           />
         </View>
 
-        {/* Poda Técnica Toggle */}
-        <View style={[styles.formRow, { marginTop: 12, alignItems: 'center' }]}>
-          <Text style={styles.formLabel}>¿Se realizó Poda Técnica?</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+        {guardandoCosecha ? (
+          <ActivityIndicator color="#2d5a27" style={{ marginVertical: 10 }} />
+        ) : (
+          <TouchableOpacity style={[styles.submitBtn, { marginTop: 12 }]} onPress={registrarCosecha}>
+            <Text style={styles.submitBtnText}>Confirmar Cosecha</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* FORMULARIO 2: REGISTRO DE PODA TÉCNICA */}
+      <View style={styles.card}>
+        <Text style={styles.label}>Control de Poda Técnica:</Text>
+        
+        <View style={[styles.formRow, { alignItems: 'center', marginVertical: 6 }]}>
+          <Text style={styles.formLabel}>¿Se realizó Poda Técnica hoy?</Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
             <TouchableOpacity
               style={[
                 styles.camaChip,
                 hizoPoda && styles.camaChipSelected,
-                { paddingHorizontal: 16, paddingVertical: 6 }
+                { paddingHorizontal: 20, paddingVertical: 8 }
               ]}
               onPress={() => setHizoPoda(true)}
             >
@@ -516,7 +544,7 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
               style={[
                 styles.camaChip,
                 !hizoPoda && styles.camaChipSelected,
-                { paddingHorizontal: 16, paddingVertical: 6 }
+                { paddingHorizontal: 20, paddingVertical: 8 }
               ]}
               onPress={() => setHizoPoda(false)}
             >
@@ -525,19 +553,18 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
           </View>
         </View>
 
-        {/* Observaciones */}
-        <View style={styles.commentContainer}>
-          <Text style={styles.formLabel}>Observaciones adicionales:</Text>
-          <TextInput
-            style={styles.textArea}
-            value={observaciones}
-            onChangeText={setObservaciones}
-            placeholder="Ej: Calidad excelente, tallos vigorosos..."
-            multiline
-            numberOfLines={2}
-          />
-        </View>
+        {guardandoPoda ? (
+          <ActivityIndicator color="#2d5a27" style={{ marginVertical: 10 }} />
+        ) : (
+          <TouchableOpacity style={[styles.submitBtn, { marginTop: 12, backgroundColor: '#166534' }]} onPress={registrarPoda}>
+            <Text style={styles.submitBtnText}>Confirmar Poda Técnica</Text>
+          </TouchableOpacity>
+        )}
       </View>
+
+    </View>
+  );
+}
 
       {/* Registrar Cosecha Button */}
       {guardando ? (

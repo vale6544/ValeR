@@ -105,25 +105,32 @@ function MatrizTalloBoton({ datos, titulo }) {
 }
 
 export default function IngresoDatos({ camas, onCargaExitosa }) {
-  const [camaId, setCamaId] = useState("");
+  // Selector Único de Cama Global
+  const [camaGlobal, setCamaGlobal] = useState(camas[0]?.id || "");
+
+  // Videos
   const [videoA, setVideoA] = useState(null);
   const [videoB, setVideoB] = useState(null);
   const [cargando, setCargando] = useState(false);
+
+  // Estados de retroalimentación e historial
   const [mensaje, setMensaje] = useState(null);
   const [historial, setHistorial] = useState([]);
   const [registroActivo, setRegistroActivo] = useState(null);
 
-  // Estados para Registro de Cosecha Diaria independiente
-  const [camaCosechaId, setCamaCosechaId] = useState("");
+  // Formulario de Cosecha
   const [tallosCosechados, setTallosCosechados] = useState("");
-  const [obsCosecha, setObsCosecha] = useState("");
   const [guardandoCosecha, setGuardandoCosecha] = useState(false);
 
-  // Estados para Registro de Poda Técnica independiente
-  const [camaPodaId, setCamaPodaId] = useState("");
+  // Formulario de Poda Técnica
   const [podaRealizada, setPodaRealizada] = useState("SI");
-  const [obsPoda, setObsPoda] = useState("");
   const [guardandoPoda, setGuardandoPoda] = useState(false);
+
+  useEffect(() => {
+    if (!camaGlobal && camas.length > 0) {
+      setCamaGlobal(camas[0].id);
+    }
+  }, [camas]);
 
   const cargarHistorial = () => {
     axios
@@ -136,24 +143,24 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
     cargarHistorial();
   }, []);
 
+  // Handler 1: Registrar Cosecha
   const registrarCosechaIndividual = async (e) => {
     e.preventDefault();
-    if (!camaCosechaId) return setMensaje({ tipo: "error", texto: "Selecciona una cama para registrar la cosecha." });
+    if (!camaGlobal) return setMensaje({ tipo: "error", texto: "Selecciona una cama en el selector superior." });
     const total = parseInt(tallosCosechados) || 0;
     if (total === 0) return setMensaje({ tipo: "error", texto: "Ingresa el número de tallos cosechados." });
 
     setGuardandoCosecha(true);
     try {
       await axios.post(`${API}/podas/`, {
-        cama_id: parseInt(camaCosechaId),
+        cama_id: parseInt(camaGlobal),
         tallos_largos: total,
         tallos_medios: 0,
         tallos_cortos: 0,
-        observaciones: `Cosecha Diaria: ${total} tallos. ${obsCosecha || ''}`.trim(),
+        observaciones: `Cosecha Diaria: ${total} tallos.`,
       });
-      setMensaje({ tipo: "ok", texto: `✓ Cosecha registrada con éxito: ${total} tallos en la Cama ${camaCosechaId}.` });
+      setMensaje({ tipo: "ok", texto: `Cosecha registrada con éxito: ${total} tallos cosechados.` });
       setTallosCosechados("");
-      setObsCosecha("");
     } catch (err) {
       setMensaje({ tipo: "error", texto: "Error al registrar la cosecha." });
     } finally {
@@ -161,21 +168,21 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
     }
   };
 
+  // Handler 2: Registrar Poda Técnica
   const registrarPodaIndividual = async (e) => {
     e.preventDefault();
-    if (!camaPodaId) return setMensaje({ tipo: "error", texto: "Selecciona una cama para registrar la poda." });
+    if (!camaGlobal) return setMensaje({ tipo: "error", texto: "Selecciona una cama en el selector superior." });
 
     setGuardandoPoda(true);
     try {
       await axios.post(`${API}/podas/`, {
-        cama_id: parseInt(camaPodaId),
+        cama_id: parseInt(camaGlobal),
         tallos_largos: 0,
         tallos_medios: 0,
         tallos_cortos: 0,
-        observaciones: `Poda Técnica: ${podaRealizada}. ${obsPoda || ''}`.trim(),
+        observaciones: `Poda Técnica: ${podaRealizada}.`,
       });
-      setMensaje({ tipo: "ok", texto: `✓ Registro de Poda Técnica (${podaRealizada}) guardado para la Cama ${camaPodaId}.` });
-      setObsPoda("");
+      setMensaje({ tipo: "ok", texto: `Registro de Poda Técnica (${podaRealizada}) guardado con éxito.` });
     } catch (err) {
       setMensaje({ tipo: "error", texto: "Error al registrar la poda técnica." });
     } finally {
@@ -183,9 +190,10 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
     }
   };
 
+  // Handler 3: Censo IA por Video
   const procesarDatos = async (e) => {
     e.preventDefault();
-    if (!camaId || !videoA || !videoB) {
+    if (!camaGlobal || !videoA || !videoB) {
       alert("Por favor selecciona una cama y sube los videos de ambos lados (A y B).");
       return;
     }
@@ -195,14 +203,14 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
     setRegistroActivo(null);
 
     const fd = new FormData();
-    fd.append("cama_id", camaId);
+    fd.append("cama_id", camaGlobal);
     fd.append("video_a", videoA);
     fd.append("video_b", videoB);
 
     try {
       const r = await axios.post(`${API}/registros/cargar-cama-completa/`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 600000, // 10 minutos
+        timeout: 600000,
       });
 
       setMensaje({
@@ -243,7 +251,42 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      
+      {/* SELECTOR ÚNICO DE CAMA GLOBAL SUPERIOR */}
+      <div className="grafico-card" style={{ background: "#f8faf8", border: "1px solid #aac9a0", padding: "16px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+          <label style={{ fontWeight: "700", color: "#1e3f1a", fontSize: "0.95rem" }}>
+            Seleccionar Cama:
+          </label>
+          <select
+            value={camaGlobal}
+            onChange={(e) => setCamaGlobal(e.target.value)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "8px",
+              border: "2px solid #2d5a27",
+              fontSize: "0.95rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              background: "white",
+              color: "#1e3f1a",
+              minWidth: "220px"
+            }}
+          >
+            <option value="">-- Seleccionar Cama --</option>
+            {camas.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+          <span style={{ fontSize: "0.83rem", color: "#64748b", fontWeight: "500" }}>
+            La cama seleccionada se aplicará automáticamente a Cosecha, Poda y Censo IA.
+          </span>
+        </div>
+      </div>
+
       {/* Alert Banner */}
       {mensaje && (
         <div
@@ -261,32 +304,15 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
         </div>
       )}
 
-      {/* REGISTRO DE COSECHA DIARIA Y PODA TÉCNICA */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" }}>
+      {/* REGISTRO DE COSECHA Y PODA TÉCNICA (BOTONES INDEPENDIENTES) */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
         
-        {/* Bloque 1: Cosecha Diaria */}
+        {/* Formulario 1: Cosecha Diaria */}
         <div className="grafico-card">
-          <h2 style={{ fontSize: "1rem", color: "#2d5a27", marginBottom: "14px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
-            ✂️ Registro de Cosecha Diaria
+          <h2 style={{ fontSize: "1rem", color: "#2d5a27", marginBottom: "14px", fontWeight: "700" }}>
+            Registro de Cosecha Diaria
           </h2>
           <form onSubmit={registrarCosechaIndividual} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", marginBottom: "4px" }}>Cama *</label>
-              <select
-                value={camaCosechaId}
-                onChange={(e) => setCamaCosechaId(e.target.value)}
-                style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #aac9a0" }}
-                required
-              >
-                <option value="">Seleccionar Cama...</option>
-                {camas.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <div>
               <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", marginBottom: "4px" }}>Tallos Cosechados *</label>
               <input
@@ -294,83 +320,71 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
                 min="1"
                 value={tallosCosechados}
                 onChange={(e) => setTallosCosechados(e.target.value)}
-                placeholder="Ej: 150"
-                style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid #aac9a0" }}
+                placeholder="0"
+                style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid #aac9a0", fontSize: "0.9rem" }}
                 required
-              />
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", marginBottom: "4px" }}>Observaciones</label>
-              <input
-                type="text"
-                value={obsCosecha}
-                onChange={(e) => setObsCosecha(e.target.value)}
-                placeholder="Ej: Calidad excelente"
-                style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid #aac9a0" }}
               />
             </div>
 
             <button
               type="submit"
               disabled={guardandoCosecha}
-              style={{ marginTop: "4px", padding: "9px 18px", background: "#2d5a27", color: "white", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}
+              style={{ marginTop: "6px", padding: "9px 18px", background: "#2d5a27", color: "white", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer", fontSize: "0.88rem" }}
             >
               {guardandoCosecha ? "Guardando..." : "Registrar Cosecha"}
             </button>
           </form>
         </div>
 
-        {/* Bloque 2: Poda Técnica */}
+        {/* Formulario 2: Control de Poda Técnica */}
         <div className="grafico-card">
-          <h2 style={{ fontSize: "1rem", color: "#2d5a27", marginBottom: "14px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
-            🌿 Control de Poda Técnica
+          <h2 style={{ fontSize: "1rem", color: "#2d5a27", marginBottom: "14px", fontWeight: "700" }}>
+            Control de Poda Técnica
           </h2>
           <form onSubmit={registrarPodaIndividual} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", marginBottom: "4px" }}>Cama *</label>
-              <select
-                value={camaPodaId}
-                onChange={(e) => setCamaPodaId(e.target.value)}
-                style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #aac9a0" }}
-                required
-              >
-                <option value="">Seleccionar Cama...</option>
-                {camas.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
               <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", marginBottom: "4px" }}>¿Se realizó Poda Técnica hoy? *</label>
-              <select
-                value={podaRealizada}
-                onChange={(e) => setPodaRealizada(e.target.value)}
-                style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid #aac9a0", fontWeight: "bold" }}
-              >
-                <option value="SI">Sí, se realizó poda técnica</option>
-                <option value="NO">No hubo poda técnica</option>
-              </select>
-            </div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="button"
+                  onClick={() => setPodaRealizada("SI")}
+                  style={{
+                    flex: 1,
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid #2d5a27",
+                    background: podaRealizada === "SI" ? "#2d5a27" : "white",
+                    color: podaRealizada === "SI" ? "white" : "#2d5a27",
+                    fontWeight: "700",
+                    cursor: "pointer"
+                  }}
+                >
+                  Sí
+                </button>
 
-            <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", marginBottom: "4px" }}>Detalles / Notas de Poda</label>
-              <input
-                type="text"
-                value={obsPoda}
-                onChange={(e) => setObsPoda(e.target.value)}
-                placeholder="Ej: Poda de formación en hilera central"
-                style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid #aac9a0" }}
-              />
+                <button
+                  type="button"
+                  onClick={() => setPodaRealizada("NO")}
+                  style={{
+                    flex: 1,
+                    padding: "8px",
+                    borderRadius: "8px",
+                    border: "1px solid #718096",
+                    background: podaRealizada === "NO" ? "#718096" : "white",
+                    color: podaRealizada === "NO" ? "white" : "#718096",
+                    fontWeight: "700",
+                    cursor: "pointer"
+                  }}
+                >
+                  No
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={guardandoPoda}
-              style={{ marginTop: "4px", padding: "9px 18px", background: "#166534", color: "white", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}
+              style={{ marginTop: "6px", padding: "9px 18px", background: "#166534", color: "white", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer", fontSize: "0.88rem" }}
             >
               {guardandoPoda ? "Guardando..." : "Registrar Poda"}
             </button>
@@ -379,28 +393,12 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
 
       </div>
 
-      {/* Upload Form */}
+      {/* FORMULARIO 3: PROCESAMIENTO DE VIDEO (CENSO IA) */}
       <div className="grafico-card">
         <h2 style={{ fontSize: "1rem", color: "#2d5a27", marginBottom: "16px", fontWeight: "700" }}>
           Procesamiento de Video (Censo IA Lado A / Lado B)
         </h2>
         <form onSubmit={procesarDatos} style={{ display: "flex", gap: "16px", alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: "180px" }}>
-            <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", marginBottom: "4px" }}>Cama *</label>
-            <select
-              value={camaId}
-              onChange={(e) => setCamaId(e.target.value)}
-              style={{ width: "100%", padding: "8px", borderRadius: "8px", border: "1px solid #aac9a0" }}
-              required
-            >
-              <option value="">Selecciona cama...</option>
-              {camas.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
           <div>
             <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", marginBottom: "4px" }}>Video Lado A *</label>
             <input
@@ -421,13 +419,13 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
               required
             />
           </div>
-          <button type="submit" disabled={cargando} className="btn-primary" style={{ padding: "9px 18px", background: "#2d5a27", color: "white", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>
+          <button type="submit" disabled={cargando} className="btn-primary" style={{ padding: "9px 18px", background: "#2d5a27", color: "white", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer", fontSize: "0.88rem" }}>
             {cargando ? "Procesando..." : "Procesar Cama Completa"}
           </button>
         </form>
       </div>
 
-      {/* Split view with Historial and Matrix */}
+      {/* HISTORIAL Y MATRIZ CRUZADA */}
       <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-start" }}>
         
         {/* Historial (Tabla izquierda) */}
