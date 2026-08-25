@@ -418,14 +418,14 @@ function PantallaProyeccion({ camas, apiUrl, cargandoCamas }) {
       })
       .finally(() => setGuardando(false));
   };
-        setCortos('');
-        setObservaciones('');
-      })
-      .catch((err) => {
-        Alert.alert('Error', err.message || 'No se pudo conectar al servidor.');
-      })
-      .finally(() => setGuardando(false));
-  };
+  //       setCortos('');
+  //       setObservaciones('');
+  //     })
+  //     .catch((err) => {
+  //       Alert.alert('Error', err.message || 'No se pudo conectar al servidor.');
+  //     })
+  //     .finally(() => setGuardando(false));
+  // };
 
   return (
     <View style={styles.screen}>
