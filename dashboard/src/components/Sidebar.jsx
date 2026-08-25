@@ -4,10 +4,9 @@ export default function Sidebar({ seccion, setSeccion, colapsado, setColapsado }
   const MENU = [
     { key: "configuracion", label: "Configuración", icon: <BedsIcon /> },
     { key: "cama_completa", label: "Ingreso de Datos", icon: <UploadIcon /> },
-    { key: "consolidado", label: "Datos Consolidados", icon: <ConsolidatedIcon /> },
     { key: "proyecciones", label: "Proyección Cama", icon: <ProjectionIcon /> },
     { key: "proyeccion_global", label: "Proyección Global", icon: <GlobalIcon /> },
-    { key: "podas", label: "Cosecha / Poda", icon: <PruningIcon /> },
+    { key: "consolidado", label: "Datos Consolidados", icon: <ConsolidatedIcon /> },
   ];
 
   return (
