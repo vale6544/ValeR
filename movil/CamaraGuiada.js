@@ -20,8 +20,13 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
   const cameraRef = useRef(null);
   const [recording, setRecording] = useState(false);
   const [zoom, setZoom] = useState(0);
-  
   const [useUltraWide, setUseUltraWide] = useState(false);
+
+  // Estados de Permisos
+  const [hasCameraPermission, setHasCameraPermission] = useState(false);
+  const [hasMicrophonePermission, setHasMicrophonePermission] = useState(false);
+  const [permissionsChecked, setPermissionsChecked] = useState(false);
+  const [timeoutCultura, setTimeoutCultura] = useState(false);
 
   // Dispositivos de Cámara con fallback dinámico instantáneo
   const defaultBackDevice = useCameraDevice('back');
@@ -31,22 +36,17 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     d.physicalDevices && Array.isArray(d.physicalDevices) && d.physicalDevices.includes('ultra-wide-angle-camera')
   );
   
-  // Fallback dinámico ultra seguro: prioriza la cámara trasera estándar principal de inmediato
+  // Dispositivo de cámara seleccionado prioritario
   const device = (useUltraWide && ultraWideDevice) 
     ? ultraWideDevice 
     : (defaultBackDevice || (backDevices.length > 0 ? backDevices[0] : (Array.isArray(devices) && devices.length > 0 ? devices[0] : null)));
-
-  // Permisos de Cámara y Micrófono
-  const [hasCameraPermission, setHasCameraPermission] = useState(false);
-  const [hasMicrophonePermission, setHasMicrophonePermission] = useState(false);
-  const [permissionsChecked, setPermissionsChecked] = useState(false);
 
   // Estados del Acelerómetro
   const [sensorData, setSensorData] = useState({ x: 0, y: 0, z: 0 });
   const [isAngleOptimal, setIsAngleOptimal] = useState(false);
   const [isSpeedOptimal, setIsSpeedOptimal] = useState(true);
 
-  // Referencias para la lógica de feedback
+  // Referencias para feedback táctil
   const prevSensorData = useRef({ x: 0, y: 0, z: 0 });
   const lastVibrationTime = useRef(0);
   const wasOptimalRef = useRef(false);
@@ -59,33 +59,26 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
       return;
     }
 
-    // Configurar tasa de refresco a 250ms (evita lag en el hilo de React Native)
     Accelerometer.setUpdateInterval(250);
 
     const subscription = Accelerometer.addListener((accelerometerData) => {
       setSensorData(accelerometerData);
       
-      // 1. Lógica de Inclinación: Apuntar perpendicularmente al suelo (teléfono plano)
-      // La gravedad actúa sobre el eje Z. Si |z| > 0.85, el ángulo es menor de ~30 grados de la horizontal.
       const zAbs = Math.abs(accelerometerData.z);
       const angleOk = zAbs > 0.85;
       setIsAngleOptimal(angleOk);
 
-      // 2. Lógica de Velocidad: Calcular cambio (delta) entre lecturas sucesivas
       const prev = prevSensorData.current;
       const deltaX = Math.abs(accelerometerData.x - prev.x);
       const deltaY = Math.abs(accelerometerData.y - prev.y);
       const deltaZ = Math.abs(accelerometerData.z - prev.z);
       const deltaTotal = deltaX + deltaY + deltaZ;
       
-      // Si el delta total excede el umbral en 250ms, el movimiento es brusco
       const speedOk = deltaTotal < 0.28;
       setIsSpeedOptimal(speedOk);
 
-      // Guardar lectura para la siguiente comparación
       prevSensorData.current = accelerometerData;
 
-      // 3. Feedback Táctil de Advertencia (Throttled a 1.5s para no saturar)
       const now = Date.now();
       const isCurrentlyOptimal = angleOk && speedOk;
 
@@ -94,7 +87,6 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
         lastVibrationTime.current = now;
       }
 
-      // 4. Feedback Positivo de Éxito al entrar en Estado Óptimo
       if (isCurrentlyOptimal && !wasOptimalRef.current) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -108,94 +100,96 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     };
   }, []);
 
-  // Verificar permisos al montar
+  // Verificar Permisos al montar de forma ultra segura
   useEffect(() => {
     if (Platform.OS === 'web') {
       setPermissionsChecked(true);
       return;
     }
-    (async () => {
-      const cameraStatus = await Camera.getCameraPermissionStatus();
-      const microphoneStatus = await Camera.getMicrophonePermissionStatus();
-      setHasCameraPermission(cameraStatus === 'granted');
-      setHasMicrophonePermission(microphoneStatus === 'granted');
-      setPermissionsChecked(true);
-    })();
+    
+    let isMounted = true;
+
+    const checkPermissions = async () => {
+      try {
+        const cameraStatus = await Camera.getCameraPermissionStatus();
+        const microphoneStatus = await Camera.getMicrophonePermissionStatus();
+        if (isMounted) {
+          setHasCameraPermission(cameraStatus === 'granted');
+          setHasMicrophonePermission(microphoneStatus === 'granted');
+        }
+      } catch (err) {
+        console.warn("Error verificando permisos:", err);
+        if (isMounted) {
+          setHasCameraPermission(true);
+          setHasMicrophonePermission(true);
+        }
+      } finally {
+        if (isMounted) {
+          setPermissionsChecked(true);
+        }
+      }
+    };
+
+    checkPermissions();
+
+    // Timer de seguridad: si después de 2.5s la cámara no se ha inicializado, activar controles
+    const timer = setTimeout(() => {
+      if (isMounted) {
+        setTimeoutCultura(true);
+      }
+    }, 2500);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   const requestPermissions = async () => {
-    const cameraStatus = await Camera.requestCameraPermission();
-    const microphoneStatus = await Camera.requestMicrophonePermission();
-    setHasCameraPermission(cameraStatus === 'granted');
-    setHasMicrophonePermission(microphoneStatus === 'granted');
+    try {
+      const cameraStatus = await Camera.requestCameraPermission();
+      const microphoneStatus = await Camera.requestMicrophonePermission();
+      setHasCameraPermission(cameraStatus === 'granted');
+      setHasMicrophonePermission(microphoneStatus === 'granted');
+    } catch (err) {
+      console.error("Error solicitando permisos:", err);
+      setHasCameraPermission(true);
+      setHasMicrophonePermission(true);
+    } finally {
+      setPermissionsChecked(true);
+    }
   };
 
-  // Retorno temprano para versión Web para evitar evaluar permisos de hardware
-  if (Platform.OS === 'web') {
-    return (
-      <View style={styles.webContainer}>
-        <View style={styles.webCard}>
-          <Text style={styles.webTitle}>Cámara Guiada (Navegador Web)</Text>
-          <Text style={styles.webText}>
-            La simulación de sensores de inclinación y la cámara en vivo no están soportadas en el navegador web debido a restricciones de hardware.
-          </Text>
-          <Text style={styles.webText}>
-            Selecciona un video de prueba desde tu computadora para simular la captura de video:
-          </Text>
-          <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#1e3f1a', marginVertical: 12 }]} onPress={abrirGaleria}>
-            <Text style={styles.permissionBtnText}>Seleccionar Video de Prueba</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096' }]} onPress={onCancel}>
-            <Text style={styles.permissionBtnText}>Cancelar</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  // Abrir galería reciente con permiso explícito
+  const abrirGaleria = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso Requerido', 'Se necesita permiso para acceder a tus videos.');
+        return;
+      }
 
-  // 1. Cargando permisos
-  if (!permissionsChecked) {
-    return (
-      <View style={styles.permissionContainer}>
-        <ActivityIndicator size="large" color="#2d5a27" />
-        <Text style={[styles.permissionText, { marginTop: 15 }]}>Cargando cámara...</Text>
-      </View>
-    );
-  }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: false,
+        quality: 1,
+      });
 
-  // 2. Permisos Denegados (isGranted === false)
-  const isPermissionGranted = hasCameraPermission && hasMicrophonePermission;
-  if (!isPermissionGranted) {
-    return (
-      <View style={styles.permissionContainer}>
-        <Text style={styles.permissionTitle}>Acceso Requerido</Text>
-        <Text style={styles.permissionText}>
-          Se necesitan los permisos de Cámara y Micrófono para poder guiarte y grabar el video de la cama.
-        </Text>
-        <TouchableOpacity
-          style={styles.permissionBtn}
-          onPress={requestPermissions}
-        >
-          <Text style={styles.permissionBtnText}>Otorgar Permisos</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 12 }]} onPress={onCancel}>
-          <Text style={styles.permissionBtnText}>Cancelar</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        onVideoSelected({
+          uri: file.uri,
+          name: file.fileName || `video_galeria_${Date.now()}.mp4`,
+          mimeType: file.mimeType || 'video/mp4',
+        });
+      }
+    } catch (error) {
+      console.error("Error al abrir galería:", error);
+      Alert.alert("Error", "No se pudo acceder a la galería de videos.");
+    }
+  };
 
-  // 3. Detectando hardware de cámara
-  if (device == null) {
-    return (
-      <View style={styles.permissionContainer}>
-        <ActivityIndicator size="large" color="#2d5a27" />
-        <Text style={[styles.permissionText, { marginTop: 15 }]}>Cargando cámara...</Text>
-      </View>
-    );
-  }
-
-  // Grabar / Detener grabación con Vision Camera
+  // Grabar / Detener grabación
   const toggleRecording = async () => {
     if (cameraRef.current) {
       if (recording) {
@@ -233,35 +227,79 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     }
   };
 
-  // Abrir galería reciente con solicitud explícita de permisos
-  const abrirGaleria = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permiso Requerido', 'Se necesita permiso de galería para elegir un video.');
-        return;
-      }
+  // Web fallback
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webContainer}>
+        <View style={styles.webCard}>
+          <Text style={styles.webTitle}>Cámara Guiada (Navegador Web)</Text>
+          <Text style={styles.webText}>
+            Selecciona un video de prueba desde tu computadora para simular la captura de video:
+          </Text>
+          <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#1e3f1a', marginVertical: 12 }]} onPress={abrirGaleria}>
+            <Text style={styles.permissionBtnText}>Seleccionar Video de Prueba</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096' }]} onPress={onCancel}>
+            <Text style={styles.permissionBtnText}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-        allowsEditing: false,
-        quality: 1,
-      });
+  // 1. Cargando permisos o esperando inicialización de hardware de cámara
+  if (!permissionsChecked || (device == null && !timeoutCultura)) {
+    return (
+      <View style={styles.permissionContainer}>
+        <ActivityIndicator size="large" color="#2d5a27" />
+        <Text style={[styles.permissionText, { marginTop: 15 }]}>Inicializando cámara...</Text>
+        
+        {/* Botón de Cancelar siempre disponible para no atrapar al usuario */}
+        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 25 }]} onPress={onCancel}>
+          <Text style={styles.permissionBtnText}>Cancelar / Volver</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const file = result.assets[0];
-        onVideoSelected({
-          uri: file.uri,
-          name: file.fileName || `video_galeria_${Date.now()}.mp4`,
-          mimeType: file.mimeType || 'video/mp4',
-        });
-      }
-    } catch (error) {
-      console.error("Error al abrir galería:", error);
-      Alert.alert("Error", "No se pudo acceder a la galería de videos.");
-    }
-  };
+  // 2. Permisos Denegados
+  const isPermissionGranted = hasCameraPermission && hasMicrophonePermission;
+  if (!isPermissionGranted && permissionsChecked) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Text style={styles.permissionTitle}>Acceso Requerido</Text>
+        <Text style={styles.permissionText}>
+          Se necesitan los permisos de Cámara y Micrófono para grabar el video de la cama.
+        </Text>
+        <TouchableOpacity style={styles.permissionBtn} onPress={requestPermissions}>
+          <Text style={styles.permissionBtnText}>Otorgar Permisos</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 12 }]} onPress={onCancel}>
+          <Text style={styles.permissionBtnText}>Cancelar</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
+  // 3. Si device es nulo tras timeout o no disponible, ofrecer fallback a Galería sin congelar
+  if (device == null) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Text style={styles.permissionTitle}>Cámara no lista</Text>
+        <Text style={[styles.permissionText, { marginBottom: 15 }]}>
+          No se detectó un dispositivo de cámara activo en este momento. Puedes seleccionar un video desde tu galería:
+        </Text>
+        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#1e3f1a', marginVertical: 6 }]} onPress={abrirGaleria}>
+          <Text style={styles.permissionBtnText}>Seleccionar Video desde Galería</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 10 }]} onPress={onCancel}>
+          <Text style={styles.permissionBtnText}>Cancelar / Volver</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // 4. Vista Activa de Cámara Guiada en Vivo
   const isOptimal = isAngleOptimal && isSpeedOptimal;
 
   return (
@@ -316,24 +354,11 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
           style={[styles.recordButton, recording && styles.recordButtonActive]}
           onPress={toggleRecording}
         >
-          <View style={[styles.recordInnerButton, recording && styles.recordInnerButtonActive]} />
+          <View style={[styles.recordButtonInner, recording && styles.recordButtonInnerActive]} />
         </TouchableOpacity>
 
-        {/* Control de Lente Físico (0.5x / 1x) */}
-        {ultraWideDevice ? (
-          <TouchableOpacity
-            style={styles.zoomButton}
-            onPress={() => {
-              setUseUltraWide(prev => !prev);
-            }}
-          >
-            <Text style={styles.zoomButtonText}>
-              {device === ultraWideDevice ? '0.5x' : '1x'}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 60 }} />
-        )}
+        {/* Espaciador Derecha */}
+        <View style={{ width: 60 }} />
       </View>
     </View>
   );
@@ -342,116 +367,128 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'black',
+    backgroundColor: '#000000',
   },
-  loaderContainer: {
+  permissionContainer: {
     flex: 1,
+    backgroundColor: '#f4f7f5',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f4f6f4',
-    padding: 20,
+    padding: 24,
   },
-  loaderText: {
-    marginTop: 10,
-    fontSize: 14,
-    color: '#2d5a27',
-    fontWeight: '600',
+  permissionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a3d16',
+    marginBottom: 10,
   },
   permissionText: {
-    fontSize: 16,
-    color: '#334155',
+    fontSize: 14,
+    color: '#4a5568',
     textAlign: 'center',
     marginBottom: 20,
-    lineHeight: 22,
+    lineHeight: 20,
   },
   permissionBtn: {
     backgroundColor: '#2d5a27',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
+    width: '100%',
+    maxWidth: 280,
+    alignItems: 'center',
   },
   permissionBtnText: {
-    color: 'white',
+    color: '#ffffff',
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: 'bold',
   },
-  permissionContainer: {
+  webContainer: {
     flex: 1,
+    backgroundColor: '#f4f7f5',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f4f6f4',
+    padding: 20,
+  },
+  webCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
     padding: 24,
-  },
-  permissionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#2d5a27',
-    marginBottom: 12,
-  },
-  overlayContainer: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
-    alignItems: 'center',
-    zIndex: 999,
-  },
-  guideBanner: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    maxWidth: 400,
+    width: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 5,
-    maxWidth: '90%',
+    elevation: 3,
+  },
+  webTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a3d16',
+    marginBottom: 12,
+  },
+  webText: {
+    fontSize: 14,
+    color: '#4a5568',
+    marginBottom: 10,
+    lineHeight: 20,
+  },
+  overlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 60,
+  },
+  guideBanner: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    maxWidth: '85%',
   },
   dangerBanner: {
-    backgroundColor: '#ef4444',
+    backgroundColor: 'rgba(229, 62, 62, 0.9)',
   },
   warningBanner: {
-    backgroundColor: '#f97316',
+    backgroundColor: 'rgba(221, 107, 32, 0.9)',
   },
   successBanner: {
-    backgroundColor: '#22c55e',
+    backgroundColor: 'rgba(56, 161, 105, 0.9)',
   },
   guideText: {
-    color: 'white',
-    fontWeight: '700',
+    color: '#ffffff',
+    fontWeight: 'bold',
     fontSize: 14,
     textAlign: 'center',
   },
   closeButton: {
     position: 'absolute',
-    top: 45,
-    left: 20,
-    zIndex: 1000,
-    padding: 10,
+    top: 40,
+    right: 20,
+    zIndex: 10,
   },
   closeIconContainer: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '800',
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   bottomControls: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 30,
     left: 0,
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 20,
-    zIndex: 1000,
   },
   galleryButton: {
     alignItems: 'center',
@@ -462,100 +499,47 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 8,
-    borderWidth: 2,
-    borderColor: 'white',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(255,255,255,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ffffff',
   },
   galleryInnerIcon: {
-    width: 24,
-    height: 18,
+    width: 20,
+    height: 16,
+    borderWidth: 2,
+    borderColor: '#ffffff',
     borderRadius: 2,
-    backgroundColor: 'white',
-    opacity: 0.8,
   },
   controlLabel: {
-    color: 'white',
+    color: '#ffffff',
     fontSize: 11,
     fontWeight: '600',
     marginTop: 4,
-    textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   recordButton: {
     width: 76,
     height: 76,
     borderRadius: 38,
     borderWidth: 4,
-    borderColor: 'white',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
   },
   recordButtonActive: {
-    borderColor: '#ef4444',
+    borderColor: '#e53e3e',
   },
-  recordInnerButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'white',
-  },
-  recordInnerButtonActive: {
-    backgroundColor: '#ef4444',
-    borderRadius: 8,
-    width: 28,
-    height: 28,
-  },
-  zoomButton: {
+  recordButtonInner: {
     width: 60,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderWidth: 1.5,
-    borderColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#e53e3e',
   },
-  zoomButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  webContainer: {
-    flex: 1,
-    backgroundColor: '#f4f6f4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  webCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    maxWidth: 500,
-    width: '100%',
-    alignItems: 'center',
-  },
-  webTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#2d5a27',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  webText: {
-    fontSize: 14,
-    color: '#4a5568',
-    textAlign: 'center',
-    marginBottom: 12,
-    lineHeight: 20,
+  recordButtonInnerActive: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
   },
 });
