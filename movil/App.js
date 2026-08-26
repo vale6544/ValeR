@@ -13,11 +13,13 @@ import {
   Platform,
   Modal
 } from 'react-native';
-import CamaraGuiada from './CamaraGuiada';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DEFAULT_API = Platform.OS === 'web'
   ? 'http://127.0.0.1:8000'
   : (process.env.EXPO_PUBLIC_API_URL || 'https://valer-a2bs.onrender.com');
+
+const OFFLINE_STORAGE_KEY = '@rosas_monitor_cola_offline_v2';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('captura'); // 'captura', 'proyeccion', 'cola_offline'
@@ -31,8 +33,34 @@ export default function App() {
   const [videoB, setVideoB] = useState(null);
   const [ladoCamaraActivo, setLadoCamaraActivo] = useState(null);
 
-  // Cola de Videos Pendientes (Offline) guardados en el dispositivo con Fecha y Hora
+  // Cola de Videos Pendientes (Offline) persistida localmente
   const [colaOffline, setColaOffline] = useState([]);
+
+  // Cargar cola offline guardada del almacenamiento local al iniciar
+  useEffect(() => {
+    AsyncStorage.getItem(OFFLINE_STORAGE_KEY)
+      .then((json) => {
+        if (json) {
+          try {
+            const data = JSON.parse(json);
+            if (Array.isArray(data)) {
+              setColaOffline(data);
+            }
+          } catch (e) {
+            console.error("Error parseando cola offline:", e);
+          }
+        }
+      })
+      .catch((err) => console.error("Error cargando cola offline:", err));
+  }, []);
+
+  // Función helper para actualizar y guardar permanentemente la cola offline
+  const actualizarColaOffline = (nuevaLista) => {
+    setColaOffline(nuevaLista);
+    AsyncStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(nuevaLista)).catch((err) =>
+      console.error("Error guardando cola offline:", err)
+    );
+  };
 
   // Obtener URL limpia sin slashes al final
   const cleanApiUrl = apiUrl ? apiUrl.replace(/\/+$/, '') : '';
@@ -125,14 +153,26 @@ export default function App() {
             setVideoB={setVideoB}
             setLadoCamaraActivo={setLadoCamaraActivo}
             colaOffline={colaOffline}
-            setColaOffline={setColaOffline}
+            setColaOffline={(fnOrVal) => {
+              setColaOffline((prev) => {
+                const nueva = typeof fnOrVal === 'function' ? fnOrVal(prev) : fnOrVal;
+                AsyncStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(nueva)).catch(err => console.error("Error guardando:", err));
+                return nueva;
+              });
+            }}
           />
         ) : activeTab === 'proyeccion' ? (
           <PantallaProyeccion camas={camas} apiUrl={cleanApiUrl} cargandoCamas={cargandoCamas} />
         ) : (
           <PantallaColaOffline
             colaOffline={colaOffline}
-            setColaOffline={setColaOffline}
+            setColaOffline={(fnOrVal) => {
+              setColaOffline((prev) => {
+                const nueva = typeof fnOrVal === 'function' ? fnOrVal(prev) : fnOrVal;
+                AsyncStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(nueva)).catch(err => console.error("Error guardando:", err));
+                return nueva;
+              });
+            }}
             apiUrl={cleanApiUrl}
           />
         )}

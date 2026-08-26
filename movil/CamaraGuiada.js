@@ -64,17 +64,20 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     const subscription = Accelerometer.addListener((accelerometerData) => {
       setSensorData(accelerometerData);
       
+      // 1. Inclinación natural y cómoda: teléfono inclinado mirando hacia la hilera de la cama
       const zAbs = Math.abs(accelerometerData.z);
-      const angleOk = zAbs > 0.85;
+      const yAbs = Math.abs(accelerometerData.y);
+      const angleOk = (zAbs >= 0.18 && zAbs <= 0.92) || (yAbs >= 0.22 && yAbs <= 0.92);
       setIsAngleOptimal(angleOk);
 
+      // 2. Control de Velocidad de Barrido
       const prev = prevSensorData.current;
       const deltaX = Math.abs(accelerometerData.x - prev.x);
       const deltaY = Math.abs(accelerometerData.y - prev.y);
       const deltaZ = Math.abs(accelerometerData.z - prev.z);
       const deltaTotal = deltaX + deltaY + deltaZ;
       
-      const speedOk = deltaTotal < 0.28;
+      const speedOk = deltaTotal < 0.35;
       setIsSpeedOptimal(speedOk);
 
       prevSensorData.current = accelerometerData;
