@@ -29,13 +29,8 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
   const [permissionsChecked, setPermissionsChecked] = useState(false);
   const [timeoutCultura, setTimeoutCultura] = useState(false);
 
-  // Sintaxis oficial de Vision Camera v4 (Sin useCameraDevices)
-  const defaultDevice = useCameraDevice('back');
-  const ultraWideDevice = useCameraDevice('back', {
-    physicalDevices: ['ultra-wide-angle-camera']
-  });
-
-  const device = (useUltraWide && ultraWideDevice) ? ultraWideDevice : defaultDevice;
+  // Sintaxis ultra segura de Vision Camera: usar la cámara trasera estándar ('back')
+  const device = useCameraDevice('back');
 
   // Estados del Acelerómetro
   const [sensorData, setSensorData] = useState({ x: 0, y: 0, z: 0 });
@@ -55,46 +50,55 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
       return;
     }
 
-    Accelerometer.setUpdateInterval(250);
+    let subscription = null;
+    try {
+      Accelerometer.setUpdateInterval(250);
 
-    const subscription = Accelerometer.addListener((accelerometerData) => {
-      setSensorData(accelerometerData);
-      
-      // Inclinación natural y cómoda: teléfono inclinado mirando hacia la hilera de la cama
-      const zAbs = Math.abs(accelerometerData.z);
-      const yAbs = Math.abs(accelerometerData.y);
-      const angleOk = (zAbs >= 0.18 && zAbs <= 0.92) || (yAbs >= 0.22 && yAbs <= 0.92);
-      setIsAngleOptimal(angleOk);
+      subscription = Accelerometer.addListener((accelerometerData) => {
+        setSensorData(accelerometerData);
+        
+        // Inclinación natural y cómoda: teléfono inclinado mirando hacia la hilera de la cama
+        const zAbs = Math.abs(accelerometerData.z);
+        const yAbs = Math.abs(accelerometerData.y);
+        const angleOk = (zAbs >= 0.18 && zAbs <= 0.92) || (yAbs >= 0.22 && yAbs <= 0.92);
+        setIsAngleOptimal(angleOk);
 
-      // Control de Velocidad de Barrido
-      const prev = prevSensorData.current;
-      const deltaX = Math.abs(accelerometerData.x - prev.x);
-      const deltaY = Math.abs(accelerometerData.y - prev.y);
-      const deltaZ = Math.abs(accelerometerData.z - prev.z);
-      const deltaTotal = deltaX + deltaY + deltaZ;
-      
-      const speedOk = deltaTotal < 0.35;
-      setIsSpeedOptimal(speedOk);
+        // Control de Velocidad de Barrido
+        const prev = prevSensorData.current;
+        const deltaX = Math.abs(accelerometerData.x - prev.x);
+        const deltaY = Math.abs(accelerometerData.y - prev.y);
+        const deltaZ = Math.abs(accelerometerData.z - prev.z);
+        const deltaTotal = deltaX + deltaY + deltaZ;
+        
+        const speedOk = deltaTotal < 0.35;
+        setIsSpeedOptimal(speedOk);
 
-      prevSensorData.current = accelerometerData;
+        prevSensorData.current = accelerometerData;
 
-      const now = Date.now();
-      const isCurrentlyOptimal = angleOk && speedOk;
+        const now = Date.now();
+        const isCurrentlyOptimal = angleOk && speedOk;
 
-      if (!isCurrentlyOptimal && (now - lastVibrationTime.current > 1500)) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        lastVibrationTime.current = now;
-      }
+        try {
+          if (!isCurrentlyOptimal && (now - lastVibrationTime.current > 1500)) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+            lastVibrationTime.current = now;
+          }
 
-      if (isCurrentlyOptimal && !wasOptimalRef.current) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      wasOptimalRef.current = isCurrentlyOptimal;
-    });
+          if (isCurrentlyOptimal && !wasOptimalRef.current) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          }
+        } catch (eHaptics) {
+          // Ignorar errores de motor vibratorio si el celular no lo soporta
+        }
+        wasOptimalRef.current = isCurrentlyOptimal;
+      });
+    } catch (eSensor) {
+      console.warn("Error iniciando acelerómetro:", eSensor);
+    }
 
     return () => {
       if (subscription) {
-        subscription.remove();
+        try { subscription.remove(); } catch (e) {}
       }
     };
   }, []);

@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 
 const DEFAULT_API = Platform.OS === 'web'
   ? 'http://127.0.0.1:8000'
@@ -231,8 +232,66 @@ function PantallaCaptura({
   const [procesando, setProcesando] = useState(false);
   const [progresoMsg, setProgresoMsg] = useState('');
 
+  const abrirGaleriaDirecta = async (lado) => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso Requerido', 'Se necesita permiso para acceder a tus videos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        const fileName = file.fileName || `video_galeria_${Date.now()}.mp4`;
+        const permanentUri = FileSystem.documentDirectory + fileName;
+
+        try {
+          await FileSystem.copyAsync({ from: file.uri, to: permanentUri });
+          const fileObj = {
+            uri: permanentUri,
+            name: fileName,
+            mimeType: file.mimeType || 'video/mp4',
+          };
+          if (lado === 'A') setVideoA(fileObj);
+          else setVideoB(fileObj);
+        } catch (e) {
+          const fileObj = {
+            uri: file.uri,
+            name: fileName,
+            mimeType: file.mimeType || 'video/mp4',
+          };
+          if (lado === 'A') setVideoA(fileObj);
+          else setVideoB(fileObj);
+        }
+      }
+    } catch (error) {
+      console.error("Error abriendo galeria:", error);
+      Alert.alert("Error", "No se pudo acceder a la galería de videos.");
+    }
+  };
+
   const seleccionarVideo = (lado) => {
-    setLadoCamaraActivo(lado);
+    Alert.alert(
+      `Video Lado ${lado}`,
+      '¿Cómo deseas ingresar el video de la cama?',
+      [
+        {
+          text: 'Grabar con Cámara',
+          onPress: () => setLadoCamaraActivo(lado)
+        },
+        {
+          text: 'Seleccionar de Galería',
+          onPress: () => abrirGaleriaDirecta(lado)
+        },
+        { text: 'Cancelar', style: 'cancel' }
+      ]
+    );
   };
 
   // Enviar video al servidor de forma ASÍNCRONA sin esperar el procesamiento de IA
