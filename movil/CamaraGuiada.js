@@ -9,23 +9,39 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { Camera, useCameraDevices, useCameraDevice } from 'react-native-vision-camera';
 import { Accelerometer } from 'expo-sensors';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 
 const { width, height } = Dimensions.get('window');
 
 export default function CamaraGuiada({ onVideoSelected, onCancel }) {
   const cameraRef = useRef(null);
   const [recording, setRecording] = useState(false);
+  const [zoom, setZoom] = useState(0);
+  const [useUltraWide, setUseUltraWide] = useState(false);
 
-  // Permisos Oficiales e Indestructibles de Expo Camera
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [micPermission, requestMicPermission] = useMicrophonePermissions();
+  // Estados de Permisos
+  const [hasCameraPermission, setHasCameraPermission] = useState(false);
+  const [hasMicrophonePermission, setHasMicrophonePermission] = useState(false);
+  const [permissionsChecked, setPermissionsChecked] = useState(false);
+  const [timeoutCultura, setTimeoutCultura] = useState(false);
 
-  // Estados del Acelerómetro (Guía Táctil y Visual)
+  // Dispositivos de Cámara con fallback dinámico instantáneo
+  const defaultBackDevice = useCameraDevice('back');
+  const devices = useCameraDevices();
+  const backDevices = Array.isArray(devices) ? devices.filter(d => d.position === 'back') : [];
+  const ultraWideDevice = backDevices.find(d => 
+    d.physicalDevices && Array.isArray(d.physicalDevices) && d.physicalDevices.includes('ultra-wide-angle-camera')
+  );
+  
+  // Dispositivo de cámara seleccionado prioritario
+  const device = (useUltraWide && ultraWideDevice) 
+    ? ultraWideDevice 
+    : (defaultBackDevice || (backDevices.length > 0 ? backDevices[0] : (Array.isArray(devices) && devices.length > 0 ? devices[0] : null)));
+
+  // Estados del Acelerómetro
   const [sensorData, setSensorData] = useState({ x: 0, y: 0, z: 0 });
   const [isAngleOptimal, setIsAngleOptimal] = useState(false);
   const [isSpeedOptimal, setIsSpeedOptimal] = useState(true);
@@ -43,60 +59,109 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
       return;
     }
 
-    let subscription = null;
-    try {
-      Accelerometer.setUpdateInterval(250);
+    Accelerometer.setUpdateInterval(250);
 
-      subscription = Accelerometer.addListener((accelerometerData) => {
-        setSensorData(accelerometerData);
-        
-        // Inclinación natural y cómoda: teléfono inclinado mirando hacia la hilera de la cama
-        const zAbs = Math.abs(accelerometerData.z);
-        const yAbs = Math.abs(accelerometerData.y);
-        const angleOk = (zAbs >= 0.18 && zAbs <= 0.92) || (yAbs >= 0.22 && yAbs <= 0.92);
-        setIsAngleOptimal(angleOk);
+    const subscription = Accelerometer.addListener((accelerometerData) => {
+      setSensorData(accelerometerData);
+      
+      const zAbs = Math.abs(accelerometerData.z);
+      const angleOk = zAbs > 0.85;
+      setIsAngleOptimal(angleOk);
 
-        // Control de Velocidad de Barrido
-        const prev = prevSensorData.current;
-        const deltaX = Math.abs(accelerometerData.x - prev.x);
-        const deltaY = Math.abs(accelerometerData.y - prev.y);
-        const deltaZ = Math.abs(accelerometerData.z - prev.z);
-        const deltaTotal = deltaX + deltaY + deltaZ;
-        
-        const speedOk = deltaTotal < 0.35;
-        setIsSpeedOptimal(speedOk);
+      const prev = prevSensorData.current;
+      const deltaX = Math.abs(accelerometerData.x - prev.x);
+      const deltaY = Math.abs(accelerometerData.y - prev.y);
+      const deltaZ = Math.abs(accelerometerData.z - prev.z);
+      const deltaTotal = deltaX + deltaY + deltaZ;
+      
+      const speedOk = deltaTotal < 0.28;
+      setIsSpeedOptimal(speedOk);
 
-        prevSensorData.current = accelerometerData;
+      prevSensorData.current = accelerometerData;
 
-        const now = Date.now();
-        const isCurrentlyOptimal = angleOk && speedOk;
+      const now = Date.now();
+      const isCurrentlyOptimal = angleOk && speedOk;
 
-        try {
-          if (!isCurrentlyOptimal && (now - lastVibrationTime.current > 1500)) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-            lastVibrationTime.current = now;
-          }
+      if (!isCurrentlyOptimal && (now - lastVibrationTime.current > 1500)) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        lastVibrationTime.current = now;
+      }
 
-          if (isCurrentlyOptimal && !wasOptimalRef.current) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-          }
-        } catch (eHaptics) {
-          // Ignorar errores de motor vibratorio si el celular no lo soporta
-        }
-        wasOptimalRef.current = isCurrentlyOptimal;
-      });
-    } catch (eSensor) {
-      console.warn("Error iniciando acelerómetro:", eSensor);
-    }
+      if (isCurrentlyOptimal && !wasOptimalRef.current) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      wasOptimalRef.current = isCurrentlyOptimal;
+    });
 
     return () => {
       if (subscription) {
-        try { subscription.remove(); } catch (e) {}
+        subscription.remove();
       }
     };
   }, []);
 
-  // Abrir galería reciente con guardado seguro permanente en el almacenamiento del dispositivo
+  // Verificar Permisos al montar de forma ultra segura
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      setPermissionsChecked(true);
+      return;
+    }
+    
+    let isMounted = true;
+
+    const checkPermissions = async () => {
+      try {
+        const cameraStatus = await Camera.getCameraPermissionStatus();
+        const microphoneStatus = await Camera.getMicrophonePermissionStatus();
+        if (isMounted) {
+          setHasCameraPermission(cameraStatus === 'granted');
+          setHasMicrophonePermission(microphoneStatus === 'granted');
+        }
+      } catch (err) {
+        console.warn("Error verificando permisos:", err);
+        if (isMounted) {
+          setHasCameraPermission(true);
+          setHasMicrophonePermission(true);
+        }
+      } finally {
+        if (isMounted) {
+          setPermissionsChecked(true);
+        }
+      }
+    };
+
+    checkPermissions();
+
+    // Timer de seguridad: si después de 2.0s la promesa nativa no responde, forzar desbloqueo de interfaz
+    const timer = setTimeout(() => {
+      if (isMounted) {
+        setPermissionsChecked(true);
+        setTimeoutCultura(true);
+      }
+    }, 2000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, []);
+
+  const requestPermissions = async () => {
+    try {
+      const cameraStatus = await Camera.requestCameraPermission();
+      const microphoneStatus = await Camera.requestMicrophonePermission();
+      setHasCameraPermission(cameraStatus === 'granted');
+      setHasMicrophonePermission(microphoneStatus === 'granted');
+    } catch (err) {
+      console.error("Error solicitando permisos:", err);
+      setHasCameraPermission(true);
+      setHasMicrophonePermission(true);
+    } finally {
+      setPermissionsChecked(true);
+    }
+  };
+
+  // Abrir galería reciente con permiso explícito
   const abrirGaleria = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -113,27 +178,11 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        const fileName = file.fileName || `video_galeria_${Date.now()}.mp4`;
-        const permanentUri = FileSystem.documentDirectory + fileName;
-
-        try {
-          await FileSystem.copyAsync({
-            from: file.uri,
-            to: permanentUri
-          });
-          onVideoSelected({
-            uri: permanentUri,
-            name: fileName,
-            mimeType: file.mimeType || 'video/mp4',
-          });
-        } catch (e) {
-          console.error("Error copiando archivo de galeria a permanente:", e);
-          onVideoSelected({
-            uri: file.uri,
-            name: fileName,
-            mimeType: file.mimeType || 'video/mp4',
-          });
-        }
+        onVideoSelected({
+          uri: file.uri,
+          name: file.fileName || `video_galeria_${Date.now()}.mp4`,
+          mimeType: file.mimeType || 'video/mp4',
+        });
       }
     } catch (error) {
       console.error("Error al abrir galería:", error);
@@ -141,57 +190,40 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     }
   };
 
-  // Grabar / Detener grabación con Expo CameraView
+  // Grabar / Detener grabación
   const toggleRecording = async () => {
-    if (!cameraRef.current) return;
-
-    if (recording) {
-      try {
-        cameraRef.current.stopRecording();
-        setRecording(false);
-      } catch (error) {
-        console.error("Error al detener grabación:", error);
-        setRecording(false);
-      }
-    } else {
-      try {
-        setRecording(true);
-        const videoPromise = cameraRef.current.recordAsync({
-          maxDuration: 60,
-          quality: '1080p',
-        });
-
-        const video = await videoPromise;
-        setRecording(false);
-
-        if (video && video.uri) {
-          const tempUri = video.uri;
-          const fileName = `video_camara_${Date.now()}.mp4`;
-          const permanentUri = FileSystem.documentDirectory + fileName;
-
-          try {
-            await FileSystem.copyAsync({
-              from: tempUri,
-              to: permanentUri
-            });
-            onVideoSelected({
-              uri: permanentUri,
-              name: fileName,
-              mimeType: 'video/mp4',
-            });
-          } catch (errFile) {
-            console.error("Error copiando a ruta permanente:", errFile);
-            onVideoSelected({
-              uri: tempUri,
-              name: fileName,
-              mimeType: 'video/mp4',
-            });
-          }
+    if (cameraRef.current) {
+      if (recording) {
+        try {
+          await cameraRef.current.stopRecording();
+          setRecording(false);
+        } catch (error) {
+          console.error("Error al detener grabación:", error);
+          setRecording(false);
         }
-      } catch (error) {
-        console.error("Error al iniciar grabación:", error);
-        Alert.alert("Error", "No se pudo realizar la grabación.");
-        setRecording(false);
+      } else {
+        try {
+          setRecording(true);
+          cameraRef.current.startRecording({
+            onRecordingFinished: (video) => {
+              setRecording(false);
+              onVideoSelected({
+                uri: video.path.startsWith('file://') ? video.path : `file://${video.path}`,
+                name: `video_camara_${Date.now()}.mp4`,
+                mimeType: 'video/mp4',
+              });
+            },
+            onRecordingError: (error) => {
+              console.error("Error de grabación:", error);
+              Alert.alert("Error", "Ocurrió un error durante la grabación.");
+              setRecording(false);
+            }
+          });
+        } catch (error) {
+          console.error("Error al iniciar grabación:", error);
+          Alert.alert("Error", "No se pudo iniciar la grabación del video.");
+          setRecording(false);
+        }
       }
     }
   };
@@ -216,12 +248,14 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     );
   }
 
-  // 1. Cargando estado de permisos
-  if (!cameraPermission || !micPermission) {
+  // 1. Cargando permisos o esperando inicialización de hardware de cámara
+  if (!permissionsChecked || (device == null && !timeoutCultura)) {
     return (
       <View style={styles.permissionContainer}>
         <ActivityIndicator size="large" color="#2d5a27" />
         <Text style={[styles.permissionText, { marginTop: 15 }]}>Inicializando cámara...</Text>
+        
+        {/* Botón de Cancelar siempre disponible para no atrapar al usuario */}
         <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 25 }]} onPress={onCancel}>
           <Text style={styles.permissionBtnText}>Cancelar / Volver</Text>
         </TouchableOpacity>
@@ -229,18 +263,16 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     );
   }
 
-  // 2. Permisos Denegados o no solicitados aún
-  if (!cameraPermission.granted || !micPermission.granted) {
+  // 2. Permisos Denegados
+  const isPermissionGranted = hasCameraPermission && hasMicrophonePermission;
+  if (!isPermissionGranted && permissionsChecked) {
     return (
       <View style={styles.permissionContainer}>
         <Text style={styles.permissionTitle}>Acceso Requerido</Text>
         <Text style={styles.permissionText}>
           Se necesitan los permisos de Cámara y Micrófono para grabar el video de la cama.
         </Text>
-        <TouchableOpacity style={styles.permissionBtn} onPress={async () => {
-          await requestCameraPermission();
-          await requestMicPermission();
-        }}>
+        <TouchableOpacity style={styles.permissionBtn} onPress={requestPermissions}>
           <Text style={styles.permissionBtnText}>Otorgar Permisos</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 12 }]} onPress={onCancel}>
@@ -250,22 +282,45 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     );
   }
 
-  // 3. Vista Activa de Cámara Guiada en Vivo con CameraView de Expo
+  // 3. Si device es nulo tras timeout o no disponible, ofrecer fallback a Galería sin congelar
+  if (device == null) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Text style={styles.permissionTitle}>Cámara no lista</Text>
+        <Text style={[styles.permissionText, { marginBottom: 15 }]}>
+          No se detectó un dispositivo de cámara activo en este momento. Puedes seleccionar un video desde tu galería:
+        </Text>
+        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#1e3f1a', marginVertical: 6 }]} onPress={abrirGaleria}>
+          <Text style={styles.permissionBtnText}>Seleccionar Video desde Galería</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 10 }]} onPress={onCancel}>
+          <Text style={styles.permissionBtnText}>Cancelar / Volver</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // 4. Vista Activa de Cámara Guiada en Vivo
+  const isOptimal = isAngleOptimal && isSpeedOptimal;
+
   return (
     <View style={styles.container}>
-      {/* Vista de Cámara Oficial Expo SDK 51 */}
-      <CameraView
+      {/* Vista de Cámara */}
+      <Camera
         ref={cameraRef}
-        style={StyleSheet.absoluteFillObject}
-        facing="back"
-        mode="video"
+        style={[StyleSheet.absoluteFillObject, { flex: 1 }]}
+        device={device}
+        isActive={true}
+        video={true}
+        audio={true}
+        resizeMode="contain"
       />
 
       {/* Guía Visual Superpuesta */}
       <View style={styles.overlayContainer} pointerEvents="none">
         {!isAngleOptimal ? (
           <View style={[styles.guideBanner, styles.dangerBanner]}>
-            <Text style={styles.guideText}>Incline la cámara hacia abajo (apuntando a la cama)</Text>
+            <Text style={styles.guideText}>Incline la cámara hacia abajo (paralela a la cama)</Text>
           </View>
         ) : !isSpeedOptimal ? (
           <View style={[styles.guideBanner, styles.warningBanner]}>
@@ -433,7 +488,7 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    justify.content: 'space-around',
+    justifyContent: 'space-around',
     paddingHorizontal: 20,
   },
   galleryButton: {

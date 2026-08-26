@@ -13,15 +13,11 @@ import {
   Platform,
   Modal
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
-import * as ImagePicker from 'expo-image-picker';
+import CamaraGuiada from './CamaraGuiada';
 
 const DEFAULT_API = Platform.OS === 'web'
   ? 'http://127.0.0.1:8000'
   : (process.env.EXPO_PUBLIC_API_URL || 'https://valer-a2bs.onrender.com');
-
-const OFFLINE_STORAGE_KEY = '@rosas_monitor_cola_offline_v2';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('captura'); // 'captura', 'proyeccion', 'cola_offline'
@@ -35,34 +31,8 @@ export default function App() {
   const [videoB, setVideoB] = useState(null);
   const [ladoCamaraActivo, setLadoCamaraActivo] = useState(null);
 
-  // Cola de Videos Pendientes (Offline) persistida localmente
+  // Cola de Videos Pendientes (Offline) guardados en el dispositivo con Fecha y Hora
   const [colaOffline, setColaOffline] = useState([]);
-
-  // Cargar cola offline guardada del almacenamiento local al iniciar
-  useEffect(() => {
-    AsyncStorage.getItem(OFFLINE_STORAGE_KEY)
-      .then((json) => {
-        if (json) {
-          try {
-            const data = JSON.parse(json);
-            if (Array.isArray(data)) {
-              setColaOffline(data);
-            }
-          } catch (e) {
-            console.error("Error parseando cola offline:", e);
-          }
-        }
-      })
-      .catch((err) => console.error("Error cargando cola offline:", err));
-  }, []);
-
-  // Función helper para actualizar y guardar permanentemente la cola offline
-  const actualizarColaOffline = (nuevaLista) => {
-    setColaOffline(nuevaLista);
-    AsyncStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(nuevaLista)).catch((err) =>
-      console.error("Error guardando cola offline:", err)
-    );
-  };
 
   // Obtener URL limpia sin slashes al final
   const cleanApiUrl = apiUrl ? apiUrl.replace(/\/+$/, '') : '';
@@ -155,26 +125,14 @@ export default function App() {
             setVideoB={setVideoB}
             setLadoCamaraActivo={setLadoCamaraActivo}
             colaOffline={colaOffline}
-            setColaOffline={(fnOrVal) => {
-              setColaOffline((prev) => {
-                const nueva = typeof fnOrVal === 'function' ? fnOrVal(prev) : fnOrVal;
-                AsyncStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(nueva)).catch(err => console.error("Error guardando:", err));
-                return nueva;
-              });
-            }}
+            setColaOffline={setColaOffline}
           />
         ) : activeTab === 'proyeccion' ? (
           <PantallaProyeccion camas={camas} apiUrl={cleanApiUrl} cargandoCamas={cargandoCamas} />
         ) : (
           <PantallaColaOffline
             colaOffline={colaOffline}
-            setColaOffline={(fnOrVal) => {
-              setColaOffline((prev) => {
-                const nueva = typeof fnOrVal === 'function' ? fnOrVal(prev) : fnOrVal;
-                AsyncStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(nueva)).catch(err => console.error("Error guardando:", err));
-                return nueva;
-              });
-            }}
+            setColaOffline={setColaOffline}
             apiUrl={cleanApiUrl}
           />
         )}
@@ -232,66 +190,8 @@ function PantallaCaptura({
   const [procesando, setProcesando] = useState(false);
   const [progresoMsg, setProgresoMsg] = useState('');
 
-  const abrirGaleriaDirecta = async (lado) => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permiso Requerido', 'Se necesita permiso para acceder a tus videos.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-        allowsEditing: false,
-        quality: 1,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const file = result.assets[0];
-        const fileName = file.fileName || `video_galeria_${Date.now()}.mp4`;
-        const permanentUri = FileSystem.documentDirectory + fileName;
-
-        try {
-          await FileSystem.copyAsync({ from: file.uri, to: permanentUri });
-          const fileObj = {
-            uri: permanentUri,
-            name: fileName,
-            mimeType: file.mimeType || 'video/mp4',
-          };
-          if (lado === 'A') setVideoA(fileObj);
-          else setVideoB(fileObj);
-        } catch (e) {
-          const fileObj = {
-            uri: file.uri,
-            name: fileName,
-            mimeType: file.mimeType || 'video/mp4',
-          };
-          if (lado === 'A') setVideoA(fileObj);
-          else setVideoB(fileObj);
-        }
-      }
-    } catch (error) {
-      console.error("Error abriendo galeria:", error);
-      Alert.alert("Error", "No se pudo acceder a la galería de videos.");
-    }
-  };
-
   const seleccionarVideo = (lado) => {
-    Alert.alert(
-      `Video Lado ${lado}`,
-      '¿Cómo deseas ingresar el video de la cama?',
-      [
-        {
-          text: 'Grabar con Cámara',
-          onPress: () => setLadoCamaraActivo(lado)
-        },
-        {
-          text: 'Seleccionar de Galería',
-          onPress: () => abrirGaleriaDirecta(lado)
-        },
-        { text: 'Cancelar', style: 'cancel' }
-      ]
-    );
+    setLadoCamaraActivo(lado);
   };
 
   // Enviar video al servidor de forma ASÍNCRONA sin esperar el procesamiento de IA
@@ -763,14 +663,6 @@ function PantallaColaOffline({ colaOffline, setColaOffline, apiUrl }) {
         `El video de ${item.cama_nombre} grabado el ${item.fecha_hora} fue subido al servidor. Los resultados se procesarán para la Web.`
       );
 
-      // Limpiar archivos locales en almacenamiento interno tras envío exitoso
-      if (item.videoA?.uri && item.videoA.uri.startsWith(FileSystem.documentDirectory)) {
-        FileSystem.deleteAsync(item.videoA.uri, { idempotent: true }).catch(() => {});
-      }
-      if (item.videoB?.uri && item.videoB.uri.startsWith(FileSystem.documentDirectory)) {
-        FileSystem.deleteAsync(item.videoB.uri, { idempotent: true }).catch(() => {});
-      }
-
       // Eliminar de la cola tras envío exitoso
       setColaOffline(prev => prev.filter(i => i.id !== item.id));
 
@@ -781,14 +673,8 @@ function PantallaColaOffline({ colaOffline, setColaOffline, apiUrl }) {
     }
   };
 
-  const eliminarItemOffline = (item) => {
-    if (item.videoA?.uri && item.videoA.uri.startsWith(FileSystem.documentDirectory)) {
-      FileSystem.deleteAsync(item.videoA.uri, { idempotent: true }).catch(() => {});
-    }
-    if (item.videoB?.uri && item.videoB.uri.startsWith(FileSystem.documentDirectory)) {
-      FileSystem.deleteAsync(item.videoB.uri, { idempotent: true }).catch(() => {});
-    }
-    setColaOffline(prev => prev.filter(i => i.id !== item.id));
+  const eliminarItemOffline = (id) => {
+    setColaOffline(prev => prev.filter(i => i.id !== id));
   };
 
   return (
@@ -827,7 +713,7 @@ function PantallaColaOffline({ colaOffline, setColaOffline, apiUrl }) {
 
               <TouchableOpacity
                 style={[styles.submitBtn, { backgroundColor: '#e53e3e', width: 90 }]}
-                onPress={() => eliminarItemOffline(item)}
+                onPress={() => eliminarItemOffline(item.id)}
               >
                 <Text style={styles.submitBtnText}>Eliminar</Text>
               </TouchableOpacity>

@@ -15,7 +15,7 @@
     },
     "android": {
       "package": "com.rosasmonitor.app",
-      "versionCode": 3,
+      "versionCode": 2,
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -27,10 +27,11 @@
     },
     "plugins": [
       [
-        "expo-camera",
+        "react-native-vision-camera",
         {
-          "cameraPermissionText": "Se requiere acceso a la cámara para la captura y conteo de rosas por visión artificial.",
-          "microphonePermissionText": "Se requiere acceso al micrófono para grabar el video de la cama."
+          "cameraPermissionText": "Se requiere acceso a la cámara para la captura y conteo continuo de rosas por visión artificial.",
+          "enableMicrophonePermission": true,
+          "microphonePermissionText": "Se requiere acceso al micrófono para grabar el video guiado de la cama."
         }
       ],
       [
