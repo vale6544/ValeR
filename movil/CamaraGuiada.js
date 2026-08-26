@@ -21,13 +21,12 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
   const cameraRef = useRef(null);
   const [recording, setRecording] = useState(false);
 
-  // Permisos
+  // Estados de Permisos
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
   const [hasMicrophonePermission, setHasMicrophonePermission] = useState(false);
   const [permissionsChecked, setPermissionsChecked] = useState(false);
-  const [timeoutCultura, setTimeoutCultura] = useState(false);
 
-  // Cámara trasera estándar ultra estable (Sin consultas ultra-wide complejas que causan crash)
+  // Cámara trasera estándar ultra estable
   const device = useCameraDevice('back');
 
   // Estados del Acelerómetro (Guía Visual e Inclinación)
@@ -97,7 +96,7 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     };
   }, []);
 
-  // Verificar Permisos al montar de forma ultra segura
+  // Solicitar Permisos Automáticamente al Abrir
   useEffect(() => {
     if (Platform.OS === 'web') {
       setPermissionsChecked(true);
@@ -106,16 +105,24 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     
     let isMounted = true;
 
-    const checkPermissions = async () => {
+    const requestPermissionsAutomaticamente = async () => {
       try {
-        const cameraStatus = await Camera.getCameraPermissionStatus();
-        const microphoneStatus = await Camera.getMicrophonePermissionStatus();
+        let cameraStatus = await Camera.getCameraPermissionStatus();
+        let microphoneStatus = await Camera.getMicrophonePermissionStatus();
+
+        if (cameraStatus !== 'granted') {
+          cameraStatus = await Camera.requestCameraPermission();
+        }
+        if (microphoneStatus !== 'granted') {
+          microphoneStatus = await Camera.requestMicrophonePermission();
+        }
+
         if (isMounted) {
           setHasCameraPermission(cameraStatus === 'granted');
           setHasMicrophonePermission(microphoneStatus === 'granted');
         }
       } catch (err) {
-        console.warn("Error verificando permisos:", err);
+        console.warn("Error solicitando permisos automáticamente:", err);
         if (isMounted) {
           setHasCameraPermission(true);
           setHasMicrophonePermission(true);
@@ -127,35 +134,8 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
       }
     };
 
-    checkPermissions();
-
-    const timer = setTimeout(() => {
-      if (isMounted) {
-        setPermissionsChecked(true);
-        setTimeoutCultura(true);
-      }
-    }, 2000);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
+    requestPermissionsAutomaticamente();
   }, []);
-
-  const requestPermissions = async () => {
-    try {
-      const cameraStatus = await Camera.requestCameraPermission();
-      const microphoneStatus = await Camera.requestMicrophonePermission();
-      setHasCameraPermission(cameraStatus === 'granted');
-      setHasMicrophonePermission(microphoneStatus === 'granted');
-    } catch (err) {
-      console.error("Error solicitando permisos:", err);
-      setHasCameraPermission(true);
-      setHasMicrophonePermission(true);
-    } finally {
-      setPermissionsChecked(true);
-    }
-  };
 
   const abrirGaleria = async () => {
     try {
@@ -264,7 +244,8 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     );
   }
 
-  if (!permissionsChecked || (device == null && !timeoutCultura)) {
+  // 1. Cargando cámara y permisos en segundo plano
+  if (!permissionsChecked || device == null) {
     return (
       <View style={styles.permissionContainer}>
         <ActivityIndicator size="large" color="#2d5a27" />
@@ -276,6 +257,7 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     );
   }
 
+  // 2. Permisos no otorgados
   const isPermissionGranted = hasCameraPermission && hasMicrophonePermission;
   if (!isPermissionGranted && permissionsChecked) {
     return (
@@ -284,33 +266,14 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
         <Text style={styles.permissionText}>
           Se necesitan los permisos de Cámara y Micrófono para grabar el video de la cama.
         </Text>
-        <TouchableOpacity style={styles.permissionBtn} onPress={requestPermissions}>
-          <Text style={styles.permissionBtnText}>Otorgar Permisos</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 12 }]} onPress={onCancel}>
-          <Text style={styles.permissionBtnText}>Cancelar</Text>
+        <TouchableOpacity style={styles.permissionBtn} onPress={onCancel}>
+          <Text style={styles.permissionBtnText}>Volver</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  if (device == null) {
-    return (
-      <View style={styles.permissionContainer}>
-        <Text style={styles.permissionTitle}>Cámara no lista</Text>
-        <Text style={[styles.permissionText, { marginBottom: 15 }]}>
-          No se detectó un dispositivo de cámara activo en este momento. Puedes seleccionar un video desde tu galería:
-        </Text>
-        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#1e3f1a', marginVertical: 6 }]} onPress={abrirGaleria}>
-          <Text style={styles.permissionBtnText}>Seleccionar Video desde Galería</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 10 }]} onPress={onCancel}>
-          <Text style={styles.permissionBtnText}>Cancelar / Volver</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
+  // 3. Renderizado de Cámara Guiada en Vivo
   return (
     <View style={styles.container}>
       <Camera
@@ -323,6 +286,7 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
         resizeMode="contain"
       />
 
+      {/* Guía Visual Superpuesta */}
       <View style={styles.overlayContainer} pointerEvents="none">
         {!isAngleOptimal ? (
           <View style={[styles.guideBanner, styles.dangerBanner]}>
@@ -339,12 +303,14 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
         )}
       </View>
 
+      {/* Botón Superior para Cerrar */}
       <TouchableOpacity style={styles.closeButton} onPress={onCancel}>
         <View style={styles.closeIconContainer}>
           <Text style={styles.closeText}>X</Text>
         </View>
       </TouchableOpacity>
 
+      {/* Controles Inferiores: Galería a la izquierda y Grabar al centro */}
       <View style={styles.bottomControls}>
         <TouchableOpacity style={styles.galleryButton} onPress={abrirGaleria}>
           <View style={styles.galleryIcon}>
@@ -489,7 +455,7 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justify.content: 'space-around',
     paddingHorizontal: 20,
   },
   galleryButton: {

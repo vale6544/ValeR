@@ -272,21 +272,7 @@ function PantallaCaptura({
   };
 
   const seleccionarVideo = (lado) => {
-    Alert.alert(
-      `Video Lado ${lado}`,
-      '¿Cómo deseas ingresar el video de la cama?',
-      [
-        {
-          text: 'Grabar con Cámara',
-          onPress: () => setLadoCamaraActivo(lado)
-        },
-        {
-          text: 'Seleccionar de Galería',
-          onPress: () => abrirGaleriaDirecta(lado)
-        },
-        { text: 'Cancelar', style: 'cancel' }
-      ]
-    );
+    setLadoCamaraActivo(lado);
   };
 
   // Enviar video al servidor de forma ASÍNCRONA sin esperar el procesamiento de IA
@@ -439,10 +425,10 @@ function PantallaCaptura({
           onPress={() => seleccionarVideo('A')}
         >
           <Text style={styles.filePickerTitle}>
-            {videoA ? '✓ Video Lado A Preparado' : '📹 Video Lado A (Cama izquierda)'}
+            {videoA ? '[PREPARADO] Video Lado A' : 'Video Lado A (Cama izquierda)'}
           </Text>
           <Text style={styles.filePickerDesc}>
-            {videoA ? videoA.name : 'Toca para abrir cámara guiada o galería'}
+            {videoA ? videoA.name : 'Toca para grabar video guiado o seleccionar de galería'}
           </Text>
         </TouchableOpacity>
 
@@ -452,10 +438,10 @@ function PantallaCaptura({
           onPress={() => seleccionarVideo('B')}
         >
           <Text style={styles.filePickerTitle}>
-            {videoB ? '✓ Video Lado B Preparado' : '📹 Video Lado B (Cama derecha)'}
+            {videoB ? '[PREPARADO] Video Lado B' : 'Video Lado B (Cama derecha)'}
           </Text>
           <Text style={styles.filePickerDesc}>
-            {videoB ? videoB.name : 'Toca para abrir cámara guiada o galería'}
+            {videoB ? videoB.name : 'Toca para grabar video guiado o seleccionar de galería'}
           </Text>
         </TouchableOpacity>
       </View>
