@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.orm import Session
 from app import analisis
 from app.database import engine, Base, get_db
@@ -1631,11 +1631,99 @@ def cargar_bloque_demo(
         }
     }
 
-# --- Nuevo Endpoint de Cama Completa ---
+# --- Procesador en segundo plano (Background Tasks) para Vision AI ---
+def procesar_cama_completa_background_worker(registro_id: int, cama_id: int, path_a: str, path_b: str):
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        cama = db.query(models.Cama).filter(models.Cama.id == cama_id).first()
+        registro = db.query(models.Registro).filter(models.Registro.id == registro_id).first()
+        if not cama or not registro:
+            return
+
+        print(f"\n[BACKGROUND] === INICIANDO PROCESAMIENTO IA PARA REGISTRO #{registro_id} (Cama {cama_id}) ===")
+        rutas_a = video_extractor.extraer_por_diferencia_visual(
+            path_a, CARPETA_FOTOGRAMAS, cantidad_maxima=None, cantidad_minima=None
+        )
+        rutas_b = video_extractor.extraer_por_diferencia_visual(
+            path_b, CARPETA_FOTOGRAMAS, cantidad_maxima=None, cantidad_minima=None
+        )
+
+        if len(rutas_a) == 0 or len(rutas_b) == 0:
+            print(f"[BACKGROUND ERROR] No se pudieron extraer fotogramas para Registro #{registro_id}")
+            registro.observaciones = "[Error: No se obtuvieron fotogramas de los videos]"
+            db.commit()
+            return
+
+        print(f"[BACKGROUND] Enviando fotogramas ({len(rutas_a)} y {len(rutas_b)}) a Vision AI API...")
+        resultado_analisis = clasificador_cama_completa.clasificar_cama_completa_con_fallback(
+            rutas_a, rutas_b,
+            filas=cama.filas_por_cama or 1,
+            variedad=cama.variedad
+        )
+
+        registro.observaciones = f"[Cama Completa unificada — Videos de ambos lados: {len(rutas_a)} y {len(rutas_b)} fotogramas]"
+
+        nueva_metrica = models.Metrica(
+            registro_id=registro.id,
+            etapa_crecimiento=None,
+            tallos_cortos=0, tallos_medios=0, tallos_largos=0,
+            total_tallos=resultado_analisis.get("total_tallos", 0),
+            score_confianza=resultado_analisis.get("confianza", 0.0),
+            boton_arroz=resultado_analisis.get("total_arroz", 0),
+            boton_alberja=resultado_analisis.get("total_alberja", 0),
+            boton_garbanzo=resultado_analisis.get("total_garbanzo", 0),
+            boton_rayando_color=resultado_analisis.get("total_rayando_color", 0),
+            boton_estrella=resultado_analisis.get("total_estrella", 0),
+            boton_cosecha=resultado_analisis.get("total_cosecha", 0),
+            etapa_dominante=resultado_analisis.get("etapa_dominante"),
+            total_botones=resultado_analisis.get("total_con_boton", 0),
+            tallo_largo_cosecha=resultado_analisis.get("tallo_largo_cosecha", 0),
+            tallo_largo_estrella=resultado_analisis.get("tallo_largo_estrella", 0),
+            tallo_largo_rayando=resultado_analisis.get("tallo_largo_rayando_color", 0),
+            tallo_largo_garbanzo=resultado_analisis.get("tallo_largo_garbanzo", 0),
+            tallo_largo_alberja=resultado_analisis.get("tallo_largo_alberja", 0),
+            tallo_largo_arroz=resultado_analisis.get("tallo_largo_arroz", 0),
+            tallo_largo_sin_boton=resultado_analisis.get("tallo_largo_sin_boton", 0),
+            tallo_medio_cosecha=resultado_analisis.get("tallo_medio_cosecha", 0),
+            tallo_medio_estrella=resultado_analisis.get("tallo_medio_estrella", 0),
+            tallo_medio_rayando=resultado_analisis.get("tallo_medio_rayando_color", 0),
+            tallo_medio_garbanzo=resultado_analisis.get("tallo_medio_garbanzo", 0),
+            tallo_medio_alberja=resultado_analisis.get("tallo_medio_alberja", 0),
+            tallo_medio_arroz=resultado_analisis.get("tallo_medio_arroz", 0),
+            tallo_medio_sin_boton=resultado_analisis.get("tallo_medio_sin_boton", 0),
+            tallo_corto_cosecha=resultado_analisis.get("tallo_corto_cosecha", 0),
+            tallo_corto_estrella=resultado_analisis.get("tallo_corto_estrella", 0),
+            tallo_corto_rayando=resultado_analisis.get("tallo_corto_rayando_color", 0),
+            tallo_corto_garbanzo=resultado_analisis.get("tallo_corto_garbanzo", 0),
+            tallo_corto_alberja=resultado_analisis.get("tallo_corto_alberja", 0),
+            tallo_corto_arroz=resultado_analisis.get("tallo_corto_arroz", 0),
+            tallo_corto_sin_boton=resultado_analisis.get("tallo_corto_sin_boton", 0),
+            detalle_tallos_json=json.dumps(resultado_analisis.get("detalle", {})),
+            matriz_botones_tallos=json.dumps(resultado_analisis.get("detalle", {}))
+        )
+        db.add(nueva_metrica)
+        db.commit()
+
+        # Limpiar temporales
+        for r in [path_a, path_b] + rutas_a + rutas_b:
+            try:
+                if os.path.exists(r): os.remove(r)
+            except Exception:
+                pass
+
+        print(f"[BACKGROUND SUCCESS] Análisis finalizado para Registro #{registro_id}. Total tallos: {resultado_analisis.get('total_tallos', 0)}")
+    except Exception as e:
+        print(f"[BACKGROUND ERROR] Excepción en background para Registro #{registro_id}: {e}")
+    finally:
+        db.close()
+
+# --- Nuevo Endpoint de Cama Completa con Subida Instantánea ---
 from app import clasificador_cama_completa
 
 @app.post("/registros/cargar-cama-completa/")
 def cargar_cama_completa(
+    background_tasks: BackgroundTasks,
     cama_id: int = Form(...),
     video_a: UploadFile = File(...),
     video_b: UploadFile = File(...),
@@ -1645,7 +1733,7 @@ def cargar_cama_completa(
     if not cama:
         raise HTTPException(status_code=404, detail="Cama no encontrada")
 
-    print(f"\n[INFO] === NUEVA PETICION CAMA COMPLETA ===")
+    print(f"\n[INFO] === RECEPCION INSTANTANEA CAMA COMPLETA ===")
     print(f"[INFO] Cama ID: {cama_id} ({cama.nombre})")
     print(f"[INFO] Recibiendo Video Lado A ({video_a.filename}) y Lado B ({video_b.filename})...")
 
@@ -1653,56 +1741,16 @@ def cargar_cama_completa(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     path_a = os.path.join(CARPETA_FOTOGRAMAS, f"video_completo_cama{cama_id}_ladoA_{timestamp}.mp4")
     path_b = os.path.join(CARPETA_FOTOGRAMAS, f"video_completo_cama{cama_id}_ladoB_{timestamp}.mp4")
-    
+
     with open(path_a, "wb") as buffer:
         shutil.copyfileobj(video_a.file, buffer)
     with open(path_b, "wb") as buffer:
         shutil.copyfileobj(video_b.file, buffer)
-    
-    print(f"[INFO] Videos guardados en disco. Iniciando extracción por diferencia visual...")
 
-    try:
-        # Extraer fotogramas dinámicamente para ambos lados
-        rutas_a = video_extractor.extraer_por_diferencia_visual(
-            path_a, CARPETA_FOTOGRAMAS, cantidad_maxima=None, cantidad_minima=None
-        )
-        rutas_b = video_extractor.extraer_por_diferencia_visual(
-            path_b, CARPETA_FOTOGRAMAS, cantidad_maxima=None, cantidad_minima=None
-        )
-    except ValueError as e:
-        print(f"[ERROR] Fallo en la extracción de fotogramas: {e}")
-        if os.path.exists(path_a): os.remove(path_a)
-        if os.path.exists(path_b): os.remove(path_b)
-        raise HTTPException(status_code=400, detail=str(e))
-
-    if len(rutas_a) == 0 or len(rutas_b) == 0:
-        print("[ERROR] No se extrajeron fotogramas de uno o ambos videos.")
-        if os.path.exists(path_a): os.remove(path_a)
-        if os.path.exists(path_b): os.remove(path_b)
-        raise HTTPException(status_code=400, detail="No se pudieron extraer fotogramas de uno o ambos videos")
-
-    print(f"[INFO] Extracción finalizada con éxito:")
-    print(f"  - Lado A: {len(rutas_a)} fotogramas obtenidos")
-    print(f"  - Lado B: {len(rutas_b)} fotogramas obtenidos")
-    print(f"[INFO] Enviando fotogramas a Claude Vision API...")
-
-    # Ejecutar análisis unificado (Lado A + Lado B)
-    resultado_analisis = clasificador_cama_completa.clasificar_cama_completa_con_fallback(
-        rutas_a, rutas_b,
-        filas=cama.filas_por_cama or 1,
-        variedad=cama.variedad
-    )
-
-    print(f"[INFO] Análisis finalizado por Vision AI:")
-    print(f"  - Total Tallos Contados: {resultado_analisis.get('total_tallos', 0)}")
-    print(f"  - Confianza: {resultado_analisis.get('confianza', 0.0)}")
-    print(f"  - Etapa Dominante: {resultado_analisis.get('etapa_dominante', 'N/A')}")
-
-    # Crear el registro en la base de datos (guardamos la referencia a video_a)
     nuevo_registro = models.Registro(
         cama_id=cama_id,
-        ruta_imagen=path_a,  # Guardamos la ruta del lado A como referencia primaria
-        observaciones=f"[Cama Completa unificada — Videos de ambos lados: {len(rutas_a)} y {len(rutas_b)} fotogramas]",
+        ruta_imagen=path_a,
+        observaciones="[En cola de procesamiento IA por visión artificial]",
         lado="C",
         segmento="Cama Completa"
     )
@@ -1710,65 +1758,20 @@ def cargar_cama_completa(
     db.commit()
     db.refresh(nuevo_registro)
 
-    # Guardar las métricas de la cama completa en la base de datos
-    nueva_metrica = models.Metrica(
-        registro_id=nuevo_registro.id,
-        etapa_crecimiento=None,
-        tallos_cortos=0, tallos_medios=0, tallos_largos=0,
-        total_tallos=resultado_analisis.get("total_tallos", 0),
-        score_confianza=resultado_analisis.get("confianza", 0.0),
-        boton_arroz=resultado_analisis.get("total_arroz", 0),
-        boton_alberja=resultado_analisis.get("total_alberja", 0),
-        boton_garbanzo=resultado_analisis.get("total_garbanzo", 0),
-        boton_rayando_color=resultado_analisis.get("total_rayando_color", 0),
-        boton_estrella=resultado_analisis.get("total_estrella", 0),
-        boton_cosecha=resultado_analisis.get("total_cosecha", 0),
-        etapa_dominante=resultado_analisis.get("etapa_dominante"),
-        total_botones=resultado_analisis.get("total_con_boton", 0),
-        tallo_largo_cosecha=resultado_analisis.get("tallo_largo_cosecha", 0),
-        tallo_largo_estrella=resultado_analisis.get("tallo_largo_estrella", 0),
-        tallo_largo_rayando=resultado_analisis.get("tallo_largo_rayando_color", 0),
-        tallo_largo_garbanzo=resultado_analisis.get("tallo_largo_garbanzo", 0),
-        tallo_largo_alberja=resultado_analisis.get("tallo_largo_alberja", 0),
-        tallo_largo_arroz=resultado_analisis.get("tallo_largo_arroz", 0),
-        tallo_largo_sin_boton=resultado_analisis.get("tallo_largo_sin_boton", 0),
-        tallo_medio_cosecha=resultado_analisis.get("tallo_medio_cosecha", 0),
-        tallo_medio_estrella=resultado_analisis.get("tallo_medio_estrella", 0),
-        tallo_medio_rayando=resultado_analisis.get("tallo_medio_rayando_color", 0),
-        tallo_medio_garbanzo=resultado_analisis.get("tallo_medio_garbanzo", 0),
-        tallo_medio_alberja=resultado_analisis.get("tallo_medio_alberja", 0),
-        tallo_medio_arroz=resultado_analisis.get("tallo_medio_arroz", 0),
-        tallo_medio_sin_boton=resultado_analisis.get("tallo_medio_sin_boton", 0),
-        tallo_corto_cosecha=resultado_analisis.get("tallo_corto_cosecha", 0),
-        tallo_corto_estrella=resultado_analisis.get("tallo_corto_estrella", 0),
-        tallo_corto_rayando=resultado_analisis.get("tallo_corto_rayando_color", 0),
-        tallo_corto_garbanzo=resultado_analisis.get("tallo_corto_garbanzo", 0),
-        tallo_corto_alberja=resultado_analisis.get("tallo_corto_alberja", 0),
-        tallo_corto_arroz=resultado_analisis.get("tallo_corto_arroz", 0),
-        tallo_corto_sin_boton=resultado_analisis.get("tallo_corto_sin_boton", 0),
-        detalle_tallos_json=json.dumps(resultado_analisis.get("detalle", {})),
-        matriz_botones_tallos=json.dumps(resultado_analisis.get("detalle", {}))
+    # Iniciar la tarea de Vision AI en segundo plano
+    background_tasks.add_task(
+        procesar_cama_completa_background_worker,
+        nuevo_registro.id,
+        cama_id,
+        path_a,
+        path_b
     )
-    db.add(nueva_metrica)
-    db.commit()
-
-    # Limpiar archivos temporales
-    for r in [path_a, path_b] + rutas_a + rutas_b:
-        try:
-            if os.path.exists(r):
-                os.remove(r)
-        except Exception:
-            pass
 
     return {
-        "mensaje": "Análisis consolidado de cama completa realizado con éxito",
+        "status": "ok",
+        "mensaje": "Video recibido correctamente y añadido a la cola de procesamiento IA.",
         "registro_id": nuevo_registro.id,
-        "fotogramas_procesados_A": len(rutas_a),
-        "fotogramas_procesados_B": len(rutas_b),
-        "total_tallos": resultado_analisis.get("total_tallos", 0),
-        "total_botones": resultado_analisis.get("total_con_boton", 0),
-        "etapa_dominante": resultado_analisis.get("etapa_dominante"),
-        "razonamiento_previo": resultado_analisis.get("razonamiento_previo", {})
+        "cama": cama.nombre
     }
 
 @app.get("/registros/cama-completa/")
