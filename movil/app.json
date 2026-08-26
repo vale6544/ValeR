@@ -6,12 +6,41 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Se requiere acceso a la cámara para el escaneo y conteo continuo de rosas por visión artificial.",
+        "NSMicrophoneUsageDescription": "Se requiere acceso al micrófono para la grabación de video guiado.",
+        "NSPhotoLibraryUsageDescription": "Se requiere acceso a la galería para seleccionar videos guardados previamente."
+      }
     },
     "android": {
       "package": "com.rosasmonitor.app",
-      "versionCode": 2
+      "versionCode": 2,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO"
+      ]
     },
+    "plugins": [
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Se requiere acceso a la cámara para la captura y conteo continuo de rosas por visión artificial.",
+          "enableMicrophonePermission": true,
+          "microphonePermissionText": "Se requiere acceso al micrófono para grabar el video guiado de la cama."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Se requiere permiso para seleccionar videos guardados en la galería."
+        }
+      ]
+    ],
     "splash": {
       "backgroundColor": "#ffffff"
     },

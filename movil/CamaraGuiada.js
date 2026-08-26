@@ -132,12 +132,13 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
 
     checkPermissions();
 
-    // Timer de seguridad: si después de 2.5s la cámara no se ha inicializado, activar controles
+    // Timer de seguridad: si después de 2.0s la promesa nativa no responde, forzar desbloqueo de interfaz
     const timer = setTimeout(() => {
       if (isMounted) {
+        setPermissionsChecked(true);
         setTimeoutCultura(true);
       }
-    }, 2500);
+    }, 2000);
 
     return () => {
       isMounted = false;
