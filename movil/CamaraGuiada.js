@@ -185,21 +185,12 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     );
   }
 
-  // 3. Detectando hardware de cámara (Con opción de selección de archivo en galería)
+  // 3. Detectando hardware de cámara
   if (device == null) {
     return (
       <View style={styles.permissionContainer}>
         <ActivityIndicator size="large" color="#2d5a27" />
-        <Text style={[styles.permissionTitle, { marginTop: 15 }]}>Inicializando Cámara</Text>
-        <Text style={[styles.permissionText, { marginBottom: 15 }]}>
-          Si la vista en vivo tarda en iniciar, puedes seleccionar un video grabado previamente desde tu galería o archivos.
-        </Text>
-        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#1e3f1a', marginVertical: 6 }]} onPress={abrirGaleria}>
-          <Text style={styles.permissionBtnText}>Seleccionar Video desde Galería</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 6 }]} onPress={onCancel}>
-          <Text style={styles.permissionBtnText}>Cancelar</Text>
-        </TouchableOpacity>
+        <Text style={[styles.permissionText, { marginTop: 15 }]}>Cargando cámara...</Text>
       </View>
     );
   }
@@ -213,18 +204,17 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
           setRecording(false);
         } catch (error) {
           console.error("Error al detener grabación:", error);
+          setRecording(false);
         }
       } else {
         try {
           setRecording(true);
-          // Vibración táctil de inicio de grabación
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-          
-          await cameraRef.current.startRecording({
+          cameraRef.current.startRecording({
             onRecordingFinished: (video) => {
+              setRecording(false);
               onVideoSelected({
-                uri: 'file://' + video.path,
-                name: `video_${Date.now()}.mp4`,
+                uri: video.path.startsWith('file://') ? video.path : `file://${video.path}`,
+                name: `video_camara_${Date.now()}.mp4`,
                 mimeType: 'video/mp4',
               });
             },
@@ -243,12 +233,19 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     }
   };
 
-  // Abrir galería reciente
+  // Abrir galería reciente con solicitud explícita de permisos
   const abrirGaleria = async () => {
     try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso Requerido', 'Se necesita permiso de galería para elegir un video.');
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Videos,
         allowsEditing: false,
+        quality: 1,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
