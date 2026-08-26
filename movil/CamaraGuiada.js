@@ -9,10 +9,11 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
-import { Camera, useCameraDevices, useCameraDevice } from 'react-native-vision-camera';
+import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import { Accelerometer } from 'expo-sensors';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 const { width, height } = Dimensions.get('window');
 
@@ -28,18 +29,13 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
   const [permissionsChecked, setPermissionsChecked] = useState(false);
   const [timeoutCultura, setTimeoutCultura] = useState(false);
 
-  // Dispositivos de Cámara con fallback dinámico instantáneo
-  const defaultBackDevice = useCameraDevice('back');
-  const devices = useCameraDevices();
-  const backDevices = Array.isArray(devices) ? devices.filter(d => d.position === 'back') : [];
-  const ultraWideDevice = backDevices.find(d => 
-    d.physicalDevices && Array.isArray(d.physicalDevices) && d.physicalDevices.includes('ultra-wide-angle-camera')
-  );
-  
-  // Dispositivo de cámara seleccionado prioritario
-  const device = (useUltraWide && ultraWideDevice) 
-    ? ultraWideDevice 
-    : (defaultBackDevice || (backDevices.length > 0 ? backDevices[0] : (Array.isArray(devices) && devices.length > 0 ? devices[0] : null)));
+  // Sintaxis oficial de Vision Camera v4 (Sin useCameraDevices)
+  const defaultDevice = useCameraDevice('back');
+  const ultraWideDevice = useCameraDevice('back', {
+    physicalDevices: ['ultra-wide-angle-camera']
+  });
+
+  const device = (useUltraWide && ultraWideDevice) ? ultraWideDevice : defaultDevice;
 
   // Estados del Acelerómetro
   const [sensorData, setSensorData] = useState({ x: 0, y: 0, z: 0 });
@@ -64,13 +60,13 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     const subscription = Accelerometer.addListener((accelerometerData) => {
       setSensorData(accelerometerData);
       
-      // 1. Inclinación natural y cómoda: teléfono inclinado mirando hacia la hilera de la cama
+      // Inclinación natural y cómoda: teléfono inclinado mirando hacia la hilera de la cama
       const zAbs = Math.abs(accelerometerData.z);
       const yAbs = Math.abs(accelerometerData.y);
       const angleOk = (zAbs >= 0.18 && zAbs <= 0.92) || (yAbs >= 0.22 && yAbs <= 0.92);
       setIsAngleOptimal(angleOk);
 
-      // 2. Control de Velocidad de Barrido
+      // Control de Velocidad de Barrido
       const prev = prevSensorData.current;
       const deltaX = Math.abs(accelerometerData.x - prev.x);
       const deltaY = Math.abs(accelerometerData.y - prev.y);
@@ -135,7 +131,6 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
 
     checkPermissions();
 
-    // Timer de seguridad: si después de 2.0s la promesa nativa no responde, forzar desbloqueo de interfaz
     const timer = setTimeout(() => {
       if (isMounted) {
         setPermissionsChecked(true);
@@ -164,7 +159,7 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     }
   };
 
-  // Abrir galería reciente con permiso explícito
+  // Abrir galería reciente con guardado seguro permanente en el almacenamiento del dispositivo
   const abrirGaleria = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -181,11 +176,27 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        onVideoSelected({
-          uri: file.uri,
-          name: file.fileName || `video_galeria_${Date.now()}.mp4`,
-          mimeType: file.mimeType || 'video/mp4',
-        });
+        const fileName = file.fileName || `video_galeria_${Date.now()}.mp4`;
+        const permanentUri = FileSystem.documentDirectory + fileName;
+
+        try {
+          await FileSystem.copyAsync({
+            from: file.uri,
+            to: permanentUri
+          });
+          onVideoSelected({
+            uri: permanentUri,
+            name: fileName,
+            mimeType: file.mimeType || 'video/mp4',
+          });
+        } catch (e) {
+          console.error("Error copiando archivo de galeria a permanente:", e);
+          onVideoSelected({
+            uri: file.uri,
+            name: fileName,
+            mimeType: file.mimeType || 'video/mp4',
+          });
+        }
       }
     } catch (error) {
       console.error("Error al abrir galería:", error);
@@ -193,7 +204,7 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     }
   };
 
-  // Grabar / Detener grabación
+  // Grabar / Detener grabación con guardado permanente en FileSystem
   const toggleRecording = async () => {
     if (cameraRef.current) {
       if (recording) {
@@ -208,13 +219,31 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
         try {
           setRecording(true);
           cameraRef.current.startRecording({
-            onRecordingFinished: (video) => {
+            onRecordingFinished: async (video) => {
               setRecording(false);
-              onVideoSelected({
-                uri: video.path.startsWith('file://') ? video.path : `file://${video.path}`,
-                name: `video_camara_${Date.now()}.mp4`,
-                mimeType: 'video/mp4',
-              });
+              try {
+                const tempUri = video.path.startsWith('file://') ? video.path : `file://${video.path}`;
+                const fileName = `video_camara_${Date.now()}.mp4`;
+                const permanentUri = FileSystem.documentDirectory + fileName;
+
+                await FileSystem.copyAsync({
+                  from: tempUri,
+                  to: permanentUri
+                });
+
+                onVideoSelected({
+                  uri: permanentUri,
+                  name: fileName,
+                  mimeType: 'video/mp4',
+                });
+              } catch (errFile) {
+                console.error("Error copiando a ruta permanente:", errFile);
+                onVideoSelected({
+                  uri: video.path.startsWith('file://') ? video.path : `file://${video.path}`,
+                  name: `video_camara_${Date.now()}.mp4`,
+                  mimeType: 'video/mp4',
+                });
+              }
             },
             onRecordingError: (error) => {
               console.error("Error de grabación:", error);
@@ -258,7 +287,6 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
         <ActivityIndicator size="large" color="#2d5a27" />
         <Text style={[styles.permissionText, { marginTop: 15 }]}>Inicializando cámara...</Text>
         
-        {/* Botón de Cancelar siempre disponible para no atrapar al usuario */}
         <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 25 }]} onPress={onCancel}>
           <Text style={styles.permissionBtnText}>Cancelar / Volver</Text>
         </TouchableOpacity>
@@ -323,7 +351,7 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
       <View style={styles.overlayContainer} pointerEvents="none">
         {!isAngleOptimal ? (
           <View style={[styles.guideBanner, styles.dangerBanner]}>
-            <Text style={styles.guideText}>Incline la cámara hacia abajo (paralela a la cama)</Text>
+            <Text style={styles.guideText}>Incline la cámara hacia abajo (apuntando a la cama)</Text>
           </View>
         ) : !isSpeedOptimal ? (
           <View style={[styles.guideBanner, styles.warningBanner]}>

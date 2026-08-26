@@ -14,6 +14,7 @@ import {
   Modal
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 
 const DEFAULT_API = Platform.OS === 'web'
   ? 'http://127.0.0.1:8000'
@@ -703,6 +704,14 @@ function PantallaColaOffline({ colaOffline, setColaOffline, apiUrl }) {
         `El video de ${item.cama_nombre} grabado el ${item.fecha_hora} fue subido al servidor. Los resultados se procesarán para la Web.`
       );
 
+      // Limpiar archivos locales en almacenamiento interno tras envío exitoso
+      if (item.videoA?.uri && item.videoA.uri.startsWith(FileSystem.documentDirectory)) {
+        FileSystem.deleteAsync(item.videoA.uri, { idempotent: true }).catch(() => {});
+      }
+      if (item.videoB?.uri && item.videoB.uri.startsWith(FileSystem.documentDirectory)) {
+        FileSystem.deleteAsync(item.videoB.uri, { idempotent: true }).catch(() => {});
+      }
+
       // Eliminar de la cola tras envío exitoso
       setColaOffline(prev => prev.filter(i => i.id !== item.id));
 
@@ -713,8 +722,14 @@ function PantallaColaOffline({ colaOffline, setColaOffline, apiUrl }) {
     }
   };
 
-  const eliminarItemOffline = (id) => {
-    setColaOffline(prev => prev.filter(i => i.id !== id));
+  const eliminarItemOffline = (item) => {
+    if (item.videoA?.uri && item.videoA.uri.startsWith(FileSystem.documentDirectory)) {
+      FileSystem.deleteAsync(item.videoA.uri, { idempotent: true }).catch(() => {});
+    }
+    if (item.videoB?.uri && item.videoB.uri.startsWith(FileSystem.documentDirectory)) {
+      FileSystem.deleteAsync(item.videoB.uri, { idempotent: true }).catch(() => {});
+    }
+    setColaOffline(prev => prev.filter(i => i.id !== item.id));
   };
 
   return (
@@ -753,7 +768,7 @@ function PantallaColaOffline({ colaOffline, setColaOffline, apiUrl }) {
 
               <TouchableOpacity
                 style={[styles.submitBtn, { backgroundColor: '#e53e3e', width: 90 }]}
-                onPress={() => eliminarItemOffline(item.id)}
+                onPress={() => eliminarItemOffline(item)}
               >
                 <Text style={styles.submitBtnText}>Eliminar</Text>
               </TouchableOpacity>
