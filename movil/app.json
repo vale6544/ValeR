@@ -15,7 +15,7 @@
     },
     "android": {
       "package": "com.rosasmonitor.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
