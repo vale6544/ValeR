@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    justify.content: 'space-around',
+    justifyContent: 'space-around',
     paddingHorizontal: 20,
   },
   galleryButton: {
