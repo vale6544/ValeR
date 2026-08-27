@@ -1665,7 +1665,8 @@ def procesar_cama_completa_background_worker(registro_id: int, cama_id: int, pat
         if not cama or not registro:
             return
 
-        # Extraer fotogramas Lado A con fallback
+        print(f"\n[BACKGROUND] === INICIANDO PROCESAMIENTO IA PARA REGISTRO #{registro_id} (Cama {cama_id}) ===")
+        print(f"[BACKGROUND] Extrayendo fotogramas de Lado A ({path_a}) y Lado B ({path_b})...")
         try:
             rutas_a = video_extractor.extraer_por_diferencia_visual(
                 path_a, CARPETA_FOTOGRAMAS, cantidad_maxima=None, cantidad_minima=None

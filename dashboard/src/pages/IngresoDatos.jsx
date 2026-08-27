@@ -219,22 +219,28 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
       });
       setVideoA(null);
       setVideoB(null);
-      cargarHistorial();
 
-      // Consultar automáticamente cada 3 segundos hasta que la IA termine el análisis
+      const nuevoId = r.data.registro_id;
       let intentos = 0;
       const interval = setInterval(() => {
         intentos += 1;
-        cargarHistorial();
-        if (intentos >= 8) {
+        axios.get(`${API}/registros/cama-completa/`).then((res) => {
+          setHistorial(res.data);
+          const rec = res.data.find((item) => String(item.id) === String(nuevoId));
+          if (rec) {
+            setRegistroActivo(rec);
+            const totalTallos = rec.total_tallos || rec.total_botones || 0;
+            if (totalTallos > 0) {
+              setMensaje({ tipo: "ok", texto: `¡Análisis de IA completado con éxito! Total tallos detectados: ${totalTallos}` });
+              clearInterval(interval);
+            }
+          }
+        }).catch((err) => console.error(err));
+        if (intentos >= 12) {
           clearInterval(interval);
         }
       }, 3000);
 
-      axios.get(`${API}/registros/cama-completa/`).then((res) => {
-        const rec = res.data.find((item) => String(item.id) === String(r.data.registro_id));
-        if (rec) setRegistroActivo(rec);
-      });
       onCargaExitosa();
     } catch (err) {
       console.error(err);
