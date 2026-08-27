@@ -79,85 +79,96 @@ def sembrar_datos_demo_si_esta_vacio():
     try:
         from app.database import SessionLocal
         db = SessionLocal()
-        count_registros = db.query(models.Registro).count()
-        if count_registros < 10:
-            print("[INFO] Generando datos históricos enriquecidos para la presentación demo...")
-            camas_def = [
-                {"id": 1, "nombre": "Cama 100", "variedad": "Freedom", "filas_por_cama": 2},
-                {"id": 2, "nombre": "Cama 101", "variedad": "Explorer", "filas_por_cama": 2},
-                {"id": 3, "nombre": "Cama 102", "variedad": "Mondial", "filas_por_cama": 2},
-                {"id": 4, "nombre": "Cama 103", "variedad": "Vendela", "filas_por_cama": 2},
-                {"id": 5, "nombre": "Cama 104", "variedad": "Topaz", "filas_por_cama": 2},
-            ]
-            for c_data in camas_def:
-                cama = db.query(models.Cama).filter(models.Cama.id == c_data["id"]).first()
-                if not cama:
-                    cama = models.Cama(**c_data)
-                    db.add(cama)
-            db.commit()
+        
+        # 1. Asegurar las 5 camas de la florícola
+        camas_def = [
+            {"id": 1, "nombre": "Cama 100", "variedad": "Freedom", "filas_por_cama": 2},
+            {"id": 2, "nombre": "Cama 101", "variedad": "Explorer", "filas_por_cama": 2},
+            {"id": 3, "nombre": "Cama 102", "variedad": "Mondial", "filas_por_cama": 2},
+            {"id": 4, "nombre": "Cama 103", "variedad": "Vendela", "filas_por_cama": 2},
+            {"id": 5, "nombre": "Cama 104", "variedad": "Topaz", "filas_por_cama": 2},
+        ]
+        for c_data in camas_def:
+            cama = db.query(models.Cama).filter(models.Cama.id == c_data["id"]).first()
+            if not cama:
+                cama = models.Cama(**c_data)
+                db.add(cama)
+        db.commit()
 
+        count_registros = db.query(models.Registro).count()
+        if count_registros < 35:
+            print("[INFO] Generando datos históricos enriquecidos para la presentación demo...")
             hoy = datetime.now()
             import random
             for d in range(14, -1, -1):
                 fecha_dia = hoy - timedelta(days=d)
                 for cama_id in [1, 2, 3, 4, 5]:
-                    cosecha = random.randint(12, 25)
-                    estrella = random.randint(15, 30)
-                    rayando = random.randint(18, 35)
-                    garbanzo = random.randint(22, 42)
-                    alberja = random.randint(24, 48)
-                    arroz = random.randint(20, 38)
-                    total_botones = cosecha + estrella + rayando + garbanzo + alberja + arroz
-                    total_tallos = total_botones + random.randint(2, 5)
+                    dia_inicio = fecha_dia.replace(hour=0, minute=0, second=0, microsecond=0)
+                    dia_fin = fecha_dia.replace(hour=23, minute=59, second=59, microsecond=999999)
+                    existente = db.query(models.Registro).filter(
+                        models.Registro.cama_id == cama_id,
+                        models.Registro.fecha >= dia_inicio,
+                        models.Registro.fecha <= dia_fin
+                    ).first()
 
-                    nuevo_reg = models.Registro(
-                        cama_id=cama_id,
-                        fecha=fecha_dia,
-                        ruta_imagen="app/imagenes/demo_sample.jpg",
-                        observaciones=f"[Censo IA unificado - Lados A y B ({fecha_dia.strftime('%d/%m/%Y')})]",
-                        lado="C",
-                        segmento="Cama Completa"
-                    )
-                    db.add(nuevo_reg)
-                    db.commit()
-                    db.refresh(nuevo_reg)
+                    if not existente:
+                        cosecha = random.randint(12, 25)
+                        estrella = random.randint(15, 30)
+                        rayando = random.randint(18, 35)
+                        garbanzo = random.randint(22, 42)
+                        alberja = random.randint(24, 48)
+                        arroz = random.randint(20, 38)
+                        total_botones = cosecha + estrella + rayando + garbanzo + alberja + arroz
+                        total_tallos = total_botones + random.randint(2, 5)
 
-                    nueva_metrica = models.Metrica(
-                        registro_id=nuevo_reg.id,
-                        etapa_crecimiento="activo",
-                        tallos_cortos=0, tallos_medios=0, tallos_largos=0,
-                        total_tallos=total_tallos,
-                        score_confianza=round(random.uniform(0.89, 0.96), 2),
-                        boton_arroz=arroz,
-                        boton_alberja=alberja,
-                        boton_garbanzo=garbanzo,
-                        boton_rayando_color=rayando,
-                        boton_estrella=estrella,
-                        boton_cosecha=cosecha,
-                        etapa_dominante="garbanzo",
-                        total_botones=total_botones,
-                        tallo_largo_cosecha=cosecha,
-                        tallo_largo_estrella=estrella,
-                        tallo_largo_rayando=rayando,
-                        tallo_largo_garbanzo=garbanzo,
-                        tallo_largo_alberja=alberja,
-                        tallo_largo_arroz=arroz,
-                        fecha_analisis=fecha_dia
-                    )
-                    db.add(nueva_metrica)
-
-                    if d > 0 and d % 2 == 0:
-                        total_cosechado = cosecha + random.randint(-2, 2)
-                        nueva_poda = models.Poda(
+                        nuevo_reg = models.Registro(
                             cama_id=cama_id,
                             fecha=fecha_dia,
-                            tallos_largos=total_cosechado,
-                            tallos_medios=0,
-                            tallos_cortos=0,
-                            total_podados=total_cosechado,
-                            observaciones=f"Cosecha diaria confirmada ({fecha_dia.strftime('%d/%m/%Y')})"
+                            ruta_imagen="app/imagenes/demo_sample.jpg",
+                            observaciones=f"[Censo IA unificado - Lados A y B ({fecha_dia.strftime('%d/%m/%Y')})]",
+                            lado="C",
+                            segmento="Cama Completa"
                         )
-                        db.add(nueva_poda)
+                        db.add(nuevo_reg)
+                        db.commit()
+                        db.refresh(nuevo_reg)
+
+                        nueva_metrica = models.Metrica(
+                            registro_id=nuevo_reg.id,
+                            etapa_crecimiento="activo",
+                            tallos_cortos=0, tallos_medios=0, tallos_largos=0,
+                            total_tallos=total_tallos,
+                            score_confianza=round(random.uniform(0.89, 0.96), 2),
+                            boton_arroz=arroz,
+                            boton_alberja=alberja,
+                            boton_garbanzo=garbanzo,
+                            boton_rayando_color=rayando,
+                            boton_estrella=estrella,
+                            boton_cosecha=cosecha,
+                            etapa_dominante="garbanzo",
+                            total_botones=total_botones,
+                            tallo_largo_cosecha=cosecha,
+                            tallo_largo_estrella=estrella,
+                            tallo_largo_rayando=rayando,
+                            tallo_largo_garbanzo=garbanzo,
+                            tallo_largo_alberja=alberja,
+                            tallo_largo_arroz=arroz,
+                            fecha_analisis=fecha_dia
+                        )
+                        db.add(nueva_metrica)
+
+                        if d > 0 and d % 2 == 0:
+                            total_cosechado = cosecha + random.randint(-2, 2)
+                            nueva_poda = models.Poda(
+                                cama_id=cama_id,
+                                fecha=fecha_dia,
+                                tallos_largos=total_cosechado,
+                                tallos_medios=0,
+                                tallos_cortos=0,
+                                total_podados=total_cosechado,
+                                observaciones=f"Cosecha diaria confirmada ({fecha_dia.strftime('%d/%m/%Y')})"
+                            )
+                            db.add(nueva_poda)
 
             db.commit()
             print("[INFO] Datos históricos de prueba poblados exitosamente en la base de datos.")
