@@ -310,7 +310,13 @@ def clasificar_tallos(ruta_imagen: str, lado: str = "A", filas: int = 1, varieda
         "source": {"type": "base64", "media_type": media_type_analizar, "data": data_analizar}
     })
 
-    modelos = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    modelos = [
+        "claude-3-5-haiku-latest",
+        "claude-3-5-haiku-20241022",
+        "claude-3-5-sonnet-latest",
+        "claude-3-5-sonnet-20241022",
+        "claude-3-haiku-20240307"
+    ]
     ultimo_error = None
 
     for m in modelos:

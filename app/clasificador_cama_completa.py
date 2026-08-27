@@ -249,7 +249,13 @@ def clasificar_un_lado(
         "text": _texto_formato_json_cama_completa_lado(lado)
     })
 
-    modelos = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    modelos = [
+        "claude-3-5-haiku-latest",
+        "claude-3-5-haiku-20241022",
+        "claude-3-5-sonnet-latest",
+        "claude-3-5-sonnet-20241022",
+        "claude-3-haiku-20240307"
+    ]
     ultimo_error = None
 
     for m in modelos:
