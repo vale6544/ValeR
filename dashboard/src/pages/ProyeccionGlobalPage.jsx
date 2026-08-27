@@ -9,24 +9,34 @@ function ProyeccionGlobal({ camas }) {
 
   useEffect(() => {
     if (camas.length === 0) return;
-    Promise.all(camas.map((c) => axios.get(`${API}/reportes/proyeccion/${c.id}`)))
+    Promise.all(
+      camas.map((c) =>
+        axios.get(`${API}/reportes/proyeccion/${c.id}`).catch(() => ({ data: { semanas: [] } }))
+      )
+    )
       .then((resultados) => {
         const semanas = {};
         resultados.forEach((r) => {
-          r.data.semanas?.forEach((s) => {
+          if (!r.data || !r.data.semanas) return;
+          r.data.semanas.forEach((s) => {
             if (!semanas[s.numero_semana]) {
               semanas[s.numero_semana] = { ...s, botones_para_cosecha: 0, detalle_etapas: {}, camas: [] };
             }
-            semanas[s.numero_semana].botones_para_cosecha += s.botones_para_cosecha;
-            semanas[s.numero_semana].camas.push({ nombre: r.data.cama_nombre, cantidad: s.botones_para_cosecha });
-            Object.entries(s.detalle_etapas).forEach(([k, v]) => {
-              semanas[s.numero_semana].detalle_etapas[k] = (semanas[s.numero_semana].detalle_etapas[k] || 0) + v;
-            });
+            semanas[s.numero_semana].botones_para_cosecha += s.botones_para_cosecha || 0;
+            semanas[s.numero_semana].camas.push({ nombre: r.data.cama_nombre || "Cama", cantidad: s.botones_para_cosecha || 0 });
+            if (s.detalle_etapas) {
+              Object.entries(s.detalle_etapas).forEach(([k, v]) => {
+                semanas[s.numero_semana].detalle_etapas[k] = (semanas[s.numero_semana].detalle_etapas[k] || 0) + v;
+              });
+            }
           });
         });
         setDatos(Object.values(semanas));
       })
-      .catch((err) => console.error("Error cargando proyección global", err));
+      .catch((err) => {
+        console.error("Error cargando proyección global", err);
+        setDatos([]);
+      });
   }, [camas]);
 
   if (datos.length === 0) return <div className="cargando">Cargando proyección global...</div>;
