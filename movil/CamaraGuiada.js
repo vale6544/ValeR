@@ -6,37 +6,37 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Dimensions,
   Platform,
 } from 'react-native';
-import { Camera, useCameraDevice } from 'react-native-vision-camera';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { Accelerometer } from 'expo-sensors';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 
-const { width, height } = Dimensions.get('window');
-
 export default function CamaraGuiada({ onVideoSelected, onCancel }) {
   const cameraRef = useRef(null);
   const [recording, setRecording] = useState(false);
 
-  // Estados de Permisos
-  const [hasCameraPermission, setHasCameraPermission] = useState(false);
-  const [hasMicrophonePermission, setHasMicrophonePermission] = useState(false);
-  const [permissionsChecked, setPermissionsChecked] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
 
-  // Cámara trasera estándar ultra estable
-  const device = useCameraDevice('back');
-
-  // Estados del Acelerómetro (Guía Visual e Inclinación)
-  const [sensorData, setSensorData] = useState({ x: 0, y: 0, z: 0 });
+  // Guía Visual e Inclinación
   const [isAngleOptimal, setIsAngleOptimal] = useState(false);
   const [isSpeedOptimal, setIsSpeedOptimal] = useState(true);
-
   const prevSensorData = useRef({ x: 0, y: 0, z: 0 });
   const lastVibrationTime = useRef(0);
   const wasOptimalRef = useRef(false);
+
+  useEffect(() => {
+    let permissionGranted = cameraPermission?.granted && microphonePermission?.granted;
+    if (!permissionGranted && cameraPermission !== null && microphonePermission !== null) {
+      (async () => {
+        if (!cameraPermission?.granted) await requestCameraPermission();
+        if (!microphonePermission?.granted) await requestMicrophonePermission();
+      })();
+    }
+  }, [cameraPermission, microphonePermission]);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -48,93 +48,39 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     let subscription = null;
     try {
       Accelerometer.setUpdateInterval(250);
-
-      subscription = Accelerometer.addListener((accelerometerData) => {
-        setSensorData(accelerometerData);
-        
-        // Inclinación natural y cómoda
-        const zAbs = Math.abs(accelerometerData.z);
-        const yAbs = Math.abs(accelerometerData.y);
+      subscription = Accelerometer.addListener((data) => {
+        const zAbs = Math.abs(data.z);
+        const yAbs = Math.abs(data.y);
         const angleOk = (zAbs >= 0.18 && zAbs <= 0.92) || (yAbs >= 0.22 && yAbs <= 0.92);
         setIsAngleOptimal(angleOk);
 
-        // Control de Velocidad de Barrido
         const prev = prevSensorData.current;
-        const deltaX = Math.abs(accelerometerData.x - prev.x);
-        const deltaY = Math.abs(accelerometerData.y - prev.y);
-        const deltaZ = Math.abs(accelerometerData.z - prev.z);
-        const deltaTotal = deltaX + deltaY + deltaZ;
-        
-        const speedOk = deltaTotal < 0.35;
+        const deltaX = Math.abs(data.x - prev.x);
+        const deltaY = Math.abs(data.y - prev.y);
+        const deltaZ = Math.abs(data.z - prev.z);
+        const speedOk = (deltaX + deltaY + deltaZ) < 0.35;
         setIsSpeedOptimal(speedOk);
 
-        prevSensorData.current = accelerometerData;
+        prevSensorData.current = data;
 
         const now = Date.now();
-        const isCurrentlyOptimal = angleOk && speedOk;
-
+        const isOptimal = angleOk && speedOk;
         try {
-          if (!isCurrentlyOptimal && (now - lastVibrationTime.current > 1500)) {
+          if (!isOptimal && (now - lastVibrationTime.current > 1500)) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
             lastVibrationTime.current = now;
           }
-
-          if (isCurrentlyOptimal && !wasOptimalRef.current) {
+          if (isOptimal && !wasOptimalRef.current) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           }
-        } catch (eHaptics) {}
-        wasOptimalRef.current = isCurrentlyOptimal;
+        } catch (e) {}
+        wasOptimalRef.current = isOptimal;
       });
-    } catch (eSensor) {
-      console.warn("Error iniciando acelerómetro:", eSensor);
-    }
+    } catch (e) {}
 
     return () => {
-      if (subscription) {
-        try { subscription.remove(); } catch (e) {}
-      }
+      if (subscription) try { subscription.remove(); } catch (e) {}
     };
-  }, []);
-
-  // Solicitar Permisos Automáticamente al Abrir
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      setPermissionsChecked(true);
-      return;
-    }
-    
-    let isMounted = true;
-
-    const requestPermissionsAutomaticamente = async () => {
-      try {
-        let cameraStatus = await Camera.getCameraPermissionStatus();
-        let microphoneStatus = await Camera.getMicrophonePermissionStatus();
-
-        if (cameraStatus !== 'granted') {
-          cameraStatus = await Camera.requestCameraPermission();
-        }
-        if (microphoneStatus !== 'granted') {
-          microphoneStatus = await Camera.requestMicrophonePermission();
-        }
-
-        if (isMounted) {
-          setHasCameraPermission(cameraStatus === 'granted');
-          setHasMicrophonePermission(microphoneStatus === 'granted');
-        }
-      } catch (err) {
-        console.warn("Error solicitando permisos automáticamente:", err);
-        if (isMounted) {
-          setHasCameraPermission(true);
-          setHasMicrophonePermission(true);
-        }
-      } finally {
-        if (isMounted) {
-          setPermissionsChecked(true);
-        }
-      }
-    };
-
-    requestPermissionsAutomaticamente();
   }, []);
 
   const abrirGaleria = async () => {
@@ -178,115 +124,87 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
   };
 
   const toggleRecording = async () => {
-    if (cameraRef.current) {
-      if (recording) {
-        try {
+    if (recording) {
+      try {
+        setRecording(false);
+        if (cameraRef.current) {
           await cameraRef.current.stopRecording();
-          setRecording(false);
-        } catch (error) {
-          console.error("Error al detener grabación:", error);
-          setRecording(false);
         }
-      } else {
-        try {
-          setRecording(true);
-          cameraRef.current.startRecording({
-            onRecordingFinished: async (video) => {
-              setRecording(false);
-              try {
-                const tempUri = video.path.startsWith('file://') ? video.path : `file://${video.path}`;
-                const fileName = `video_camara_${Date.now()}.mp4`;
-                const permanentUri = FileSystem.documentDirectory + fileName;
+      } catch (error) {
+        console.error("Error al detener grabación:", error);
+        setRecording(false);
+      }
+    } else {
+      if (!cameraRef.current) return;
+      try {
+        setRecording(true);
+        const video = await cameraRef.current.recordAsync({
+          maxDuration: 120,
+        });
+        setRecording(false);
 
-                await FileSystem.copyAsync({ from: tempUri, to: permanentUri });
-
-                onVideoSelected({
-                  uri: permanentUri,
-                  name: fileName,
-                  mimeType: 'video/mp4',
-                });
-              } catch (errFile) {
-                onVideoSelected({
-                  uri: video.path.startsWith('file://') ? video.path : `file://${video.path}`,
-                  name: `video_camara_${Date.now()}.mp4`,
-                  mimeType: 'video/mp4',
-                });
-              }
-            },
-            onRecordingError: (error) => {
-              console.error("Error de grabación:", error);
-              Alert.alert("Error", "Ocurrió un error durante la grabación.");
-              setRecording(false);
-            }
-          });
-        } catch (error) {
-          console.error("Error al iniciar grabación:", error);
-          Alert.alert("Error", "No se pudo iniciar la grabación del video.");
-          setRecording(false);
+        if (video && video.uri) {
+          const fileName = `video_camara_${Date.now()}.mp4`;
+          const permanentUri = FileSystem.documentDirectory + fileName;
+          try {
+            await FileSystem.copyAsync({ from: video.uri, to: permanentUri });
+            onVideoSelected({
+              uri: permanentUri,
+              name: fileName,
+              mimeType: 'video/mp4',
+            });
+          } catch (e) {
+            onVideoSelected({
+              uri: video.uri,
+              name: fileName,
+              mimeType: 'video/mp4',
+            });
+          }
         }
+      } catch (error) {
+        console.error("Error al grabar video:", error);
+        Alert.alert("Error", "No se pudo realizar la grabación del video.");
+        setRecording(false);
       }
     }
   };
 
-  if (Platform.OS === 'web') {
-    return (
-      <View style={styles.webContainer}>
-        <View style={styles.webCard}>
-          <Text style={styles.webTitle}>Cámara Guiada (Navegador Web)</Text>
-          <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#1e3f1a', marginVertical: 12 }]} onPress={abrirGaleria}>
-            <Text style={styles.permissionBtnText}>Seleccionar Video de Prueba</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096' }]} onPress={onCancel}>
-            <Text style={styles.permissionBtnText}>Cancelar</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // 1. Cargando cámara y permisos en segundo plano
-  if (!permissionsChecked || device == null) {
+  if (!cameraPermission || !microphonePermission) {
     return (
       <View style={styles.permissionContainer}>
         <ActivityIndicator size="large" color="#2d5a27" />
         <Text style={[styles.permissionText, { marginTop: 15 }]}>Inicializando cámara...</Text>
-        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 25 }]} onPress={onCancel}>
-          <Text style={styles.permissionBtnText}>Cancelar / Volver</Text>
-        </TouchableOpacity>
       </View>
     );
   }
 
-  // 2. Permisos no otorgados
-  const isPermissionGranted = hasCameraPermission && hasMicrophonePermission;
-  if (!isPermissionGranted && permissionsChecked) {
+  if (!cameraPermission.granted || !microphonePermission.granted) {
     return (
       <View style={styles.permissionContainer}>
-        <Text style={styles.permissionTitle}>Acceso Requerido</Text>
-        <Text style={styles.permissionText}>
-          Se necesitan los permisos de Cámara y Micrófono para grabar el video de la cama.
-        </Text>
-        <TouchableOpacity style={styles.permissionBtn} onPress={onCancel}>
-          <Text style={styles.permissionBtnText}>Volver</Text>
+        <Text style={styles.permissionText}>Se requieren permisos de cámara y micrófono para grabar los recorridos.</Text>
+        <TouchableOpacity style={styles.permissionBtn} onPress={async () => {
+          await requestCameraPermission();
+          await requestMicrophonePermission();
+        }}>
+          <Text style={styles.permissionBtnText}>Conceder Permisos</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.permissionBtn, { backgroundColor: '#718096', marginTop: 12 }]} onPress={onCancel}>
+          <Text style={styles.permissionBtnText}>Cancelar</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  // 3. Renderizado de Cámara Guiada en Vivo
   return (
     <View style={styles.container}>
-      <Camera
+      <CameraView
         ref={cameraRef}
-        style={[StyleSheet.absoluteFillObject, { flex: 1 }]}
-        device={device}
-        isActive={true}
-        video={true}
-        audio={true}
-        resizeMode="contain"
+        style={StyleSheet.absoluteFillObject}
+        facing="back"
+        mode="video"
+        mute={false}
       />
 
-      {/* Guía Visual Superpuesta */}
       <View style={styles.overlayContainer} pointerEvents="none">
         {!isAngleOptimal ? (
           <View style={[styles.guideBanner, styles.dangerBanner]}>
@@ -303,14 +221,12 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
         )}
       </View>
 
-      {/* Botón Superior para Cerrar */}
       <TouchableOpacity style={styles.closeButton} onPress={onCancel}>
         <View style={styles.closeIconContainer}>
           <Text style={styles.closeText}>X</Text>
         </View>
       </TouchableOpacity>
 
-      {/* Controles Inferiores: Galería a la izquierda y Grabar al centro */}
       <View style={styles.bottomControls}>
         <TouchableOpacity style={styles.galleryButton} onPress={abrirGaleria}>
           <View style={styles.galleryIcon}>
@@ -326,7 +242,9 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
           <View style={[styles.recordButtonInner, recording && styles.recordButtonInnerActive]} />
         </TouchableOpacity>
 
-        <View style={{ width: 60 }} />
+        <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+          <Text style={styles.controlLabel}>Cancelar</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -348,7 +266,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1a3d16',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   permissionText: {
     fontSize: 14,
@@ -362,76 +280,42 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
-    width: '100%',
-    maxWidth: 280,
-    alignItems: 'center',
   },
   permissionBtnText: {
     color: '#ffffff',
     fontSize: 15,
     fontWeight: 'bold',
   },
-  webContainer: {
-    flex: 1,
-    backgroundColor: '#f4f7f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  webCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 24,
-    maxWidth: 400,
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  webTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1a3d16',
-    marginBottom: 12,
-  },
-  webText: {
-    fontSize: 14,
-    color: '#4a5568',
-    marginBottom: 10,
-    lineHeight: 20,
-  },
   overlayContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-start',
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    right: 20,
     alignItems: 'center',
-    paddingTop: 60,
   },
   guideBanner: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 20,
-    maxWidth: '85%',
+    alignItems: 'center',
   },
   dangerBanner: {
-    backgroundColor: 'rgba(229, 62, 62, 0.9)',
+    backgroundColor: 'rgba(229, 62, 62, 0.85)',
   },
   warningBanner: {
-    backgroundColor: 'rgba(221, 107, 32, 0.9)',
+    backgroundColor: 'rgba(221, 107, 32, 0.85)',
   },
   successBanner: {
-    backgroundColor: 'rgba(56, 161, 105, 0.9)',
+    backgroundColor: 'rgba(56, 161, 105, 0.85)',
   },
   guideText: {
     color: '#ffffff',
+    fontSize: 13,
     fontWeight: 'bold',
-    fontSize: 14,
-    textAlign: 'center',
   },
   closeButton: {
     position: 'absolute',
-    top: 40,
+    top: 45,
     right: 20,
     zIndex: 10,
   },
@@ -439,75 +323,74 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeText: {
     color: '#ffffff',
+    fontSize: 18,
     fontWeight: 'bold',
-    fontSize: 16,
   },
   bottomControls: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 40,
     left: 0,
     right: 0,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-around',
+    alignItems: 'center',
     paddingHorizontal: 20,
   },
   galleryButton: {
     alignItems: 'center',
-    justifyContent: 'center',
-    width: 60,
   },
   galleryIcon: {
     width: 44,
     height: 44,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ffffff',
   },
   galleryInnerIcon: {
     width: 20,
-    height: 16,
+    height: 20,
+    borderRadius: 4,
     borderWidth: 2,
     borderColor: '#ffffff',
-    borderRadius: 2,
-  },
-  controlLabel: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 4,
   },
   recordButton: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 4,
     borderColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
   },
   recordButtonActive: {
     borderColor: '#e53e3e',
   },
   recordButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#e53e3e',
   },
   recordButtonInnerActive: {
     width: 30,
     height: 30,
     borderRadius: 6,
+    backgroundColor: '#e53e3e',
+  },
+  cancelButton: {
+    alignItems: 'center',
+  },
+  controlLabel: {
+    color: '#ffffff',
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: '600',
   },
 });

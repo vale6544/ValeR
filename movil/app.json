@@ -27,6 +27,13 @@
     },
     "plugins": [
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Se requiere acceso a la cámara para la captura y conteo continuo de rosas por visión artificial.",
+          "microphonePermission": "Se requiere acceso al micrófono para grabar el video guiado de la cama."
+        }
+      ],
+      [
         "react-native-vision-camera",
         {
           "cameraPermissionText": "Se requiere acceso a la cámara para la captura y conteo continuo de rosas por visión artificial.",
