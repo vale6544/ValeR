@@ -56,24 +56,51 @@ class Metrica(Base):
     id = Column(Integer, primary_key=True, index=True)
     registro_id = Column(Integer, ForeignKey("registros.id"), nullable=False)
 
-    # Estado del censo. etapa_crecimiento se usa como bandera de error:
-    # vale "error_analisis" cuando el análisis de IA falló.
+    # Clasificación por altura de tallos
     etapa_crecimiento = Column(String(50), nullable=True)
+    tallos_cortos = Column(Integer, default=0)
+    tallos_medios = Column(Integer, default=0)
+    tallos_largos = Column(Integer, default=0)
     total_tallos = Column(Integer, default=0)
     score_confianza = Column(Float, nullable=True)
 
-    # Conteo por estado de botón (censo real, sin clasificación por largo de tallo)
+    # Clasificación por tamaño de botón
     boton_arroz = Column(Integer, default=0)
     boton_alberja = Column(Integer, default=0)
     boton_garbanzo = Column(Integer, default=0)
     boton_rayando_color = Column(Integer, default=0)
     boton_estrella = Column(Integer, default=0)
     boton_cosecha = Column(Integer, default=0)
-    boton_sin_boton = Column(Integer, default=0)
     etapa_dominante = Column(String(50), nullable=True)
     total_botones = Column(Integer, default=0)
+    matriz_botones_tallos = Column(Text, nullable=True)  # JSON string
 
-    detalle_tallos_json = Column(Text, nullable=True)  # JSON crudo del razonamiento de la IA
+# Detección combinada tallo + botón
+    tallo_largo_cosecha  = Column(Integer, default=0)
+    tallo_largo_estrella = Column(Integer, default=0)
+    tallo_largo_rayando  = Column(Integer, default=0)
+    tallo_largo_garbanzo = Column(Integer, default=0)
+    tallo_largo_alberja  = Column(Integer, default=0)
+    tallo_largo_arroz    = Column(Integer, default=0)
+    tallo_largo_sin_boton = Column(Integer, default=0)
+
+    tallo_medio_cosecha  = Column(Integer, default=0)
+    tallo_medio_estrella = Column(Integer, default=0)
+    tallo_medio_rayando  = Column(Integer, default=0)
+    tallo_medio_garbanzo = Column(Integer, default=0)
+    tallo_medio_alberja  = Column(Integer, default=0)
+    tallo_medio_arroz    = Column(Integer, default=0)
+    tallo_medio_sin_boton = Column(Integer, default=0)
+
+    tallo_corto_cosecha  = Column(Integer, default=0)
+    tallo_corto_estrella = Column(Integer, default=0)
+    tallo_corto_rayando  = Column(Integer, default=0)
+    tallo_corto_garbanzo = Column(Integer, default=0)
+    tallo_corto_alberja  = Column(Integer, default=0)
+    tallo_corto_arroz    = Column(Integer, default=0)
+    tallo_corto_sin_boton = Column(Integer, default=0)
+
+    detalle_tallos_json  = Column(Text, nullable=True)
 
     fecha_analisis = Column(DateTime, default=obtener_hora_ecuador)
 
@@ -86,11 +113,13 @@ class Poda(Base):
     id = Column(Integer, primary_key=True, index=True)
     cama_id = Column(Integer, ForeignKey("camas.id"), nullable=False)
     fecha = Column(DateTime, default=obtener_hora_ecuador)
+    tallos_largos = Column(Integer, default=0)
+    tallos_medios = Column(Integer, default=0)
+    tallos_cortos = Column(Integer, default=0)
     total_podados = Column(Integer, default=0)
     observaciones = Column(Text, nullable=True)
 
     cama = relationship("Cama")
-
 
 class Segmento(Base):
     __tablename__ = "segmentos"
@@ -102,7 +131,6 @@ class Segmento(Base):
     activo = Column(Boolean, default=True)
 
     cama = relationship("Cama", back_populates="segmentos")
-
 
 class CicloCama(Base):
     __tablename__ = "ciclo_cama"

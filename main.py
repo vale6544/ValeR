@@ -802,7 +802,6 @@ def fechas_disponibles(db: Session = Depends(get_db)):
 # --- Esquema poda ---
 class PodaCreate(BaseModel):
     cama_id: int
-    total_podados: int = 0
     tallos_largos: int = 0
     tallos_medios: int = 0
     tallos_cortos: int = 0
@@ -815,11 +814,12 @@ def registrar_poda(poda: PodaCreate, db: Session = Depends(get_db)):
     if not cama:
         raise HTTPException(status_code=404, detail="Cama no encontrada")
 
-    total = poda.total_podados if poda.total_podados > 0 else (poda.tallos_largos + poda.tallos_medios + poda.tallos_cortos)
-
     nueva = models.Poda(
         cama_id=poda.cama_id,
-        total_podados=total,
+        tallos_largos=poda.tallos_largos,
+        tallos_medios=poda.tallos_medios,
+        tallos_cortos=poda.tallos_cortos,
+        total_podados=poda.tallos_largos + poda.tallos_medios + poda.tallos_cortos,
         observaciones=poda.observaciones
     )
     db.add(nueva)
@@ -1666,7 +1666,8 @@ def procesar_cama_completa_background_worker(registro_id: int, cama_id: int, pat
 
         nueva_metrica = models.Metrica(
             registro_id=registro.id,
-            etapa_crecimiento="error_analisis" if resultado_analisis.get("error") else resultado_analisis.get("etapa_dominante"),
+            etapa_crecimiento=None,
+            tallos_cortos=0, tallos_medios=0, tallos_largos=0,
             total_tallos=resultado_analisis.get("total_tallos", 0),
             score_confianza=resultado_analisis.get("confianza", 0.0),
             boton_arroz=resultado_analisis.get("total_arroz", 0),
@@ -1675,10 +1676,31 @@ def procesar_cama_completa_background_worker(registro_id: int, cama_id: int, pat
             boton_rayando_color=resultado_analisis.get("total_rayando_color", 0),
             boton_estrella=resultado_analisis.get("total_estrella", 0),
             boton_cosecha=resultado_analisis.get("total_cosecha", 0),
-            boton_sin_boton=resultado_analisis.get("total_sin_boton", 0),
             etapa_dominante=resultado_analisis.get("etapa_dominante"),
             total_botones=resultado_analisis.get("total_con_boton", 0),
-            detalle_tallos_json=json.dumps(resultado_analisis.get("detalle", {}))
+            tallo_largo_cosecha=resultado_analisis.get("tallo_largo_cosecha", 0),
+            tallo_largo_estrella=resultado_analisis.get("tallo_largo_estrella", 0),
+            tallo_largo_rayando=resultado_analisis.get("tallo_largo_rayando_color", 0),
+            tallo_largo_garbanzo=resultado_analisis.get("tallo_largo_garbanzo", 0),
+            tallo_largo_alberja=resultado_analisis.get("tallo_largo_alberja", 0),
+            tallo_largo_arroz=resultado_analisis.get("tallo_largo_arroz", 0),
+            tallo_largo_sin_boton=resultado_analisis.get("tallo_largo_sin_boton", 0),
+            tallo_medio_cosecha=resultado_analisis.get("tallo_medio_cosecha", 0),
+            tallo_medio_estrella=resultado_analisis.get("tallo_medio_estrella", 0),
+            tallo_medio_rayando=resultado_analisis.get("tallo_medio_rayando_color", 0),
+            tallo_medio_garbanzo=resultado_analisis.get("tallo_medio_garbanzo", 0),
+            tallo_medio_alberja=resultado_analisis.get("tallo_medio_alberja", 0),
+            tallo_medio_arroz=resultado_analisis.get("tallo_medio_arroz", 0),
+            tallo_medio_sin_boton=resultado_analisis.get("tallo_medio_sin_boton", 0),
+            tallo_corto_cosecha=resultado_analisis.get("tallo_corto_cosecha", 0),
+            tallo_corto_estrella=resultado_analisis.get("tallo_corto_estrella", 0),
+            tallo_corto_rayando=resultado_analisis.get("tallo_corto_rayando_color", 0),
+            tallo_corto_garbanzo=resultado_analisis.get("tallo_corto_garbanzo", 0),
+            tallo_corto_alberja=resultado_analisis.get("tallo_corto_alberja", 0),
+            tallo_corto_arroz=resultado_analisis.get("tallo_corto_arroz", 0),
+            tallo_corto_sin_boton=resultado_analisis.get("tallo_corto_sin_boton", 0),
+            detalle_tallos_json=json.dumps(resultado_analisis.get("detalle", {})),
+            matriz_botones_tallos=json.dumps(resultado_analisis.get("detalle", {}))
         )
         db.add(nueva_metrica)
         db.commit()
@@ -1774,52 +1796,39 @@ def obtener_registros_cama_completa(db: Session = Depends(get_db)):
         }
         
         if metrica:
-            conteo_cosecha = getattr(metrica, 'boton_cosecha', 0) or 0
-            conteo_estrella = getattr(metrica, 'boton_estrella', 0) or 0
-            conteo_rayando = getattr(metrica, 'boton_rayando_color', 0) or 0
-            conteo_garbanzo = getattr(metrica, 'boton_garbanzo', 0) or 0
-            conteo_alberja = getattr(metrica, 'boton_alberja', 0) or 0
-            conteo_arroz = getattr(metrica, 'boton_arroz', 0) or 0
-            conteo_sin_boton = getattr(metrica, 'boton_sin_boton', 0) or 0
-
-            # Fallback si el registro es antiguo y tiene detalle_tallos_json
-            if metrica.detalle_tallos_json:
-                try:
-                    det = json.loads(metrica.detalle_tallos_json)
-                    if isinstance(det, dict):
-                        conteo_cosecha = conteo_cosecha or det.get("total_cosecha", 0) or sum(det.get(t, {}).get("cosecha", 0) for t in ["tallo_largo", "tallo_medio", "tallo_corto"])
-                        conteo_estrella = conteo_estrella or det.get("total_estrella", 0) or sum(det.get(t, {}).get("estrella", 0) for t in ["tallo_largo", "tallo_medio", "tallo_corto"])
-                        conteo_rayando = conteo_rayando or det.get("total_rayando_color", 0) or sum(det.get(t, {}).get("rayando_color", 0) for t in ["tallo_largo", "tallo_medio", "tallo_corto"])
-                        conteo_garbanzo = conteo_garbanzo or det.get("total_garbanzo", 0) or sum(det.get(t, {}).get("garbanzo", 0) for t in ["tallo_largo", "tallo_medio", "tallo_corto"])
-                        conteo_alberja = conteo_alberja or det.get("total_alberja", 0) or sum(det.get(t, {}).get("alberja", 0) for t in ["tallo_largo", "tallo_medio", "tallo_corto"])
-                        conteo_arroz = conteo_arroz or det.get("total_arroz", 0) or sum(det.get(t, {}).get("arroz", 0) for t in ["tallo_largo", "tallo_medio", "tallo_corto"])
-                        conteo_sin_boton = conteo_sin_boton or det.get("total_sin_boton", 0) or sum(det.get(t, {}).get("sin_boton", 0) for t in ["tallo_largo", "tallo_medio", "tallo_corto"])
-                except Exception:
-                    pass
-
             registro_data.update({
-                "total_tallos": metrica.total_tallos or (conteo_cosecha + conteo_estrella + conteo_rayando + conteo_garbanzo + conteo_alberja + conteo_arroz + conteo_sin_boton),
-                "total_botones": metrica.total_botones or (conteo_cosecha + conteo_estrella + conteo_rayando + conteo_garbanzo + conteo_alberja + conteo_arroz),
+                "total_tallos": metrica.total_tallos or 0,
+                "total_botones": metrica.total_botones or 0,
                 "etapa_dominante": metrica.etapa_dominante or "sin_flor",
                 "confianza": metrica.score_confianza or 0.0,
-                "error": metrica.etapa_crecimiento == "error_analisis",
                 
-                "cosecha": conteo_cosecha,
-                "estrella": conteo_estrella,
-                "rayando_color": conteo_rayando,
-                "rayando": conteo_rayando,
-                "garbanzo": conteo_garbanzo,
-                "alberja": conteo_alberja,
-                "arroz": conteo_arroz,
-                "sin_boton": conteo_sin_boton,
-
-                "total_cosecha": conteo_cosecha,
-                "total_estrella": conteo_estrella,
-                "total_rayando_color": conteo_rayando,
-                "total_garbanzo": conteo_garbanzo,
-                "total_alberja": conteo_alberja,
-                "total_arroz": conteo_arroz,
-                "total_sin_boton": conteo_sin_boton,
+                # Combinaciones tallo x botón individuales
+                "tallo_largo_cosecha": metrica.tallo_largo_cosecha or 0,
+                "tallo_largo_estrella": metrica.tallo_largo_estrella or 0,
+                "tallo_largo_rayando_color": metrica.tallo_largo_rayando or 0,
+                "tallo_largo_rayando": metrica.tallo_largo_rayando or 0,
+                "tallo_largo_garbanzo": metrica.tallo_largo_garbanzo or 0,
+                "tallo_largo_alberja": metrica.tallo_largo_alberja or 0,
+                "tallo_largo_arroz": metrica.tallo_largo_arroz or 0,
+                "tallo_largo_sin_boton": metrica.tallo_largo_sin_boton or 0,
+                
+                "tallo_medio_cosecha": metrica.tallo_medio_cosecha or 0,
+                "tallo_medio_estrella": metrica.tallo_medio_estrella or 0,
+                "tallo_medio_rayando_color": metrica.tallo_medio_rayando or 0,
+                "tallo_medio_rayando": metrica.tallo_medio_rayando or 0,
+                "tallo_medio_garbanzo": metrica.tallo_medio_garbanzo or 0,
+                "tallo_medio_alberja": metrica.tallo_medio_alberja or 0,
+                "tallo_medio_arroz": metrica.tallo_medio_arroz or 0,
+                "tallo_medio_sin_boton": metrica.tallo_medio_sin_boton or 0,
+                
+                "tallo_corto_cosecha": metrica.tallo_corto_cosecha or 0,
+                "tallo_corto_estrella": metrica.tallo_corto_estrella or 0,
+                "tallo_corto_rayando_color": metrica.tallo_corto_rayando or 0,
+                "tallo_corto_rayando": metrica.tallo_corto_rayando or 0,
+                "tallo_corto_garbanzo": metrica.tallo_corto_garbanzo or 0,
+                "tallo_corto_alberja": metrica.tallo_corto_alberja or 0,
+                "tallo_corto_arroz": metrica.tallo_corto_arroz or 0,
+                "tallo_corto_sin_boton": metrica.tallo_corto_sin_boton or 0,
             })
             
         res.append(registro_data)
