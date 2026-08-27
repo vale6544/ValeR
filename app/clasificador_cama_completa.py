@@ -249,26 +249,31 @@ def clasificar_un_lado(
         "text": _texto_formato_json_cama_completa_lado(lado)
     })
 
-    try:
-        respuesta = client.messages.create(
-            model="claude-3-haiku-20240307",  # Modelo estable de Claude 3 Haiku con soporte Vision y compatible con todas las API Keys
-            max_tokens=3000,
-            messages=[{"role": "user", "content": contenido}]
-        )
+    modelos = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    ultimo_error = None
 
-        texto = respuesta.content[0].text.strip()
-        print(f"\n--- RESPUESTA CRUDA DE CLAUDE LADO {lado} ---")
-        print(texto)
-        print("---------------------------------------------\n")
-        
-        texto = texto.replace("```json", "").replace("```", "").strip()
-        datos = json.loads(texto)
-        return datos
-    except Exception as e:
-        print(f"ERROR EN clasificar_un_lado PARA LADO {lado}: {e}")
-        import traceback
-        traceback.print_exc()
-        raise e
+    for m in modelos:
+        try:
+            respuesta = client.messages.create(
+                model=m,
+                max_tokens=3000,
+                messages=[{"role": "user", "content": contenido}]
+            )
+
+            texto = respuesta.content[0].text.strip()
+            print(f"\n--- RESPUESTA CRUDA DE CLAUDE ({m}) LADO {lado} ---")
+            print(texto)
+            print("---------------------------------------------\n")
+            
+            texto = texto.replace("```json", "").replace("```", "").strip()
+            datos = json.loads(texto)
+            return datos
+        except Exception as e:
+            ultimo_error = e
+            print(f"[WARNING] Modelo Anthropic '{m}' no disponible: {e}. Probando siguiente modelo...")
+
+    if ultimo_error:
+        raise ultimo_error
 
 
 def sumar_resultados(datos_a: dict, datos_b: dict) -> dict:

@@ -310,16 +310,27 @@ def clasificar_tallos(ruta_imagen: str, lado: str = "A", filas: int = 1, varieda
         "source": {"type": "base64", "media_type": media_type_analizar, "data": data_analizar}
     })
 
-    respuesta = client.messages.create(
-        model="claude-3-haiku-20240307",  # Modelo estable de Claude 3 Haiku con soporte Vision
-        max_tokens=2000,  # Aumentado a 2000 para dar espacio a la lista_tallos_detectados y evitar truncado
-        messages=[{"role": "user", "content": contenido}]
-    )
+    modelos = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    ultimo_error = None
 
-    texto = respuesta.content[0].text.strip()
-    texto = texto.replace("```json", "").replace("```", "").strip()
-    datos = json.loads(texto)
-    return _procesar_respuesta(datos)
+    for m in modelos:
+        try:
+            respuesta = client.messages.create(
+                model=m,
+                max_tokens=2000,
+                messages=[{"role": "user", "content": contenido}]
+            )
+
+            texto = respuesta.content[0].text.strip()
+            texto = texto.replace("```json", "").replace("```", "").strip()
+            datos = json.loads(texto)
+            return _procesar_respuesta(datos)
+        except Exception as e:
+            ultimo_error = e
+            print(f"[WARNING] Modelo {m} no disponible: {e}. Probando siguiente...")
+
+    if ultimo_error:
+        raise ultimo_error
 
 
 def clasificar_con_fallback(ruta_imagen: str, lado: str = "A", filas: int = 1, variedad: str = None) -> dict:
