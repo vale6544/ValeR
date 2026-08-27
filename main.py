@@ -95,13 +95,13 @@ def sembrar_datos_demo_si_esta_vacio():
                 db.add(cama)
         db.commit()
 
-        # 2. Preservar Cama 100 intacta y poblar las demás camas si no tienen historial
+        # 2. Preservar Cama 100 intacta y poblar las demás camas si no tienen los 14 días
         hoy = datetime.now()
         import random
         for cama_id in [2, 3, 4, 5]:
             count_cama = db.query(models.Registro).filter(models.Registro.cama_id == cama_id).count()
-            if count_cama < 10:
-                print(f"[INFO] Generando historial continuo para Cama ID {cama_id}...")
+            if count_cama < 15:
+                print(f"[INFO] Generando 14 días continuos para Cama ID {cama_id}...")
                 for d in range(14, -1, -1):
                     fecha_dia = hoy - timedelta(days=d)
                     dia_inicio = fecha_dia.replace(hour=0, minute=0, second=0, microsecond=0)
