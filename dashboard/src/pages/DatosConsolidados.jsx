@@ -19,7 +19,7 @@ const TALLOS_LIST = [
 
 function Distribucion({ datos, titulo }) {
   const pieData = BOTONES_LIST.map((b) => {
-    const val = TALLOS_LIST.reduce((s, t) => s + (datos[`${t.key}_${b.key}`] || 0), 0);
+    const val = datos[b.key] || datos[`total_${b.key}`] || datos[`boton_${b.key}`] || (datos.conteo && datos.conteo[b.key]) || 0;
     return { name: b.label, value: val, fill: b.color };
   }).filter((d) => d.value > 0);
 

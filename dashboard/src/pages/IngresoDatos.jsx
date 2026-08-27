@@ -20,28 +20,21 @@ const TALLOS_LIST = [
 
 function MatrizTalloBoton({ datos, titulo }) {
   if (!datos) return null;
-  const getCampo = (tallo, boton) => {
-    if (datos.matriz) {
-      return datos.matriz[`${tallo}_${boton}`] || 0;
-    }
-    return datos[`${tallo}_${boton}`] || 0;
+  
+  const getCampo = (boton) => {
+    if (datos.conteo) return datos.conteo[boton] || 0;
+    if (datos.totales_botones) return datos.totales_botones[boton] || 0;
+    return datos[`total_${boton}`] || datos[`boton_${boton}`] || 0;
   };
-  const totalPorBoton = {};
-  const totalPorTallo = {};
-  let granTotal = 0;
-  BOTONES_LIST.forEach((b) => {
-    totalPorBoton[b.key] = TALLOS_LIST.reduce((s, t) => s + getCampo(t.key, b.key), 0);
-  });
-  TALLOS_LIST.forEach((t) => {
-    totalPorTallo[t.key] = BOTONES_LIST.reduce((s, b) => s + getCampo(t.key, b.key), 0);
-    granTotal += totalPorTallo[t.key];
-  });
+
+  const totalCosecha = getCampo("cosecha");
+  const granTotal = BOTONES_LIST.reduce((sum, b) => sum + getCampo(b.key), 0);
 
   if (granTotal === 0) {
     return (
       <div className="grafico-card" style={{ marginBottom: "24px" }}>
         <h3 style={{ fontSize: "0.95rem", color: "#2d5a27", marginBottom: "8px", fontWeight: "700" }}>{titulo}</h3>
-        <p style={{ color: "#999", fontSize: "0.88rem" }}>Sin datos combinados para este registro</p>
+        <p style={{ color: "#999", fontSize: "0.88rem" }}>Sin datos de botones para este registro</p>
       </div>
     );
   }
@@ -53,51 +46,33 @@ function MatrizTalloBoton({ datos, titulo }) {
         <table className="tabla">
           <thead>
             <tr>
-              <th style={{ minWidth: "130px" }}>Tallo</th>
               {BOTONES_LIST.map((b) => (
-                <th key={b.key} style={{ background: b.color + "44", textAlign: "center", minWidth: "75px" }}>
+                <th key={b.key} style={{ background: b.color + "44", textAlign: "center", minWidth: "85px" }}>
                   {b.label}
                 </th>
               ))}
-              <th style={{ textAlign: "center", background: "#f0f4f0" }}>Total</th>
+              <th style={{ textAlign: "center", background: "#f0f4f0" }}>Total Botones</th>
             </tr>
           </thead>
           <tbody>
-            {TALLOS_LIST.map((t) => (
-              <tr key={t.key}>
-                <td style={{ background: t.color, fontWeight: "600" }}>{t.label}</td>
-                {BOTONES_LIST.map((b) => {
-                  const val = getCampo(t.key, b.key);
-                  return (
-                    <td key={b.key} style={{ textAlign: "center", background: val > 0 ? b.color + "33" : "white" }}>
-                      {val > 0 ? <strong>{val}</strong> : <span style={{ color: "#ddd" }}>-</span>}
-                    </td>
-                  );
-                })}
-                <td style={{ textAlign: "center", fontWeight: "700", color: "#2d5a27", background: "#f0f4f0" }}>
-                  {totalPorTallo[t.key]}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr style={{ background: "#f0f4f0", fontWeight: "700" }}>
-              <td>Total botón</td>
-              {BOTONES_LIST.map((b) => (
-                <td key={b.key} style={{ textAlign: "center" }}>
-                  {totalPorBoton[b.key] > 0 ? totalPorBoton[b.key] : "-"}
-                </td>
-              ))}
-              <td style={{ textAlign: "center", color: "#2d5a27", fontSize: "1.1rem" }}>{granTotal}</td>
+            <tr>
+              {BOTONES_LIST.map((b) => {
+                const val = getCampo(b.key);
+                return (
+                  <td key={b.key} style={{ textAlign: "center", background: val > 0 ? b.color + "33" : "white" }}>
+                    {val > 0 ? <strong>{val}</strong> : <span style={{ color: "#ddd" }}>-</span>}
+                  </td>
+                );
+              })}
+              <td style={{ textAlign: "center", fontWeight: "700", color: "#2d5a27", background: "#f0f4f0", fontSize: "1.1rem" }}>
+                {granTotal}
+              </td>
             </tr>
-          </tfoot>
+          </tbody>
         </table>
         <div style={{ marginTop: "12px", padding: "10px 14px", background: "#f0fdf4", borderRadius: "8px", borderLeft: "4px solid #2d5a27" }}>
           <span style={{ fontWeight: "600", color: "#2d5a27" }}>Listos para cosechar: </span>
-          <span style={{ fontSize: "1.2rem", fontWeight: "700", color: "#2d5a27" }}>{totalPorBoton["cosecha"] || 0}</span>
-          <span style={{ color: "#666", fontSize: "0.85rem", marginLeft: "8px" }}>
-            ({getCampo("tallo_largo", "cosecha")} largo • {getCampo("tallo_medio", "cosecha")} medio • {getCampo("tallo_corto", "cosecha")} corto)
-          </span>
+          <span style={{ fontSize: "1.2rem", fontWeight: "700", color: "#2d5a27" }}>{totalCosecha}</span>
         </div>
       </div>
     </div>
