@@ -215,11 +215,21 @@ export default function IngresoDatos({ camas, onCargaExitosa }) {
 
       setMensaje({
         tipo: "ok",
-        texto: "Análisis consolidado completado con éxito.",
+        texto: "Video recibido correctamente. El análisis de IA se está procesando en segundo plano...",
       });
       setVideoA(null);
       setVideoB(null);
       cargarHistorial();
+
+      // Consultar automáticamente cada 3 segundos hasta que la IA termine el análisis
+      let intentos = 0;
+      const interval = setInterval(() => {
+        intentos += 1;
+        cargarHistorial();
+        if (intentos >= 8) {
+          clearInterval(interval);
+        }
+      }, 3000);
 
       axios.get(`${API}/registros/cama-completa/`).then((res) => {
         const rec = res.data.find((item) => String(item.id) === String(r.data.registro_id));
