@@ -17,6 +17,7 @@ import * as FileSystem from 'expo-file-system';
 export default function CamaraGuiada({ onVideoSelected, onCancel }) {
   const cameraRef = useRef(null);
   const [recording, setRecording] = useState(false);
+  const isRecordingRef = useRef(false);
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
@@ -24,6 +25,9 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
   // Guía Visual e Inclinación
   const [isAngleOptimal, setIsAngleOptimal] = useState(false);
   const [isSpeedOptimal, setIsSpeedOptimal] = useState(true);
+  const isAngleOptimalRef = useRef(false);
+  const isSpeedOptimalRef = useRef(true);
+
   const prevSensorData = useRef({ x: 0, y: 0, z: 0 });
   const lastVibrationTime = useRef(0);
   const wasOptimalRef = useRef(false);
@@ -47,26 +51,35 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
 
     let subscription = null;
     try {
-      Accelerometer.setUpdateInterval(250);
+      Accelerometer.setUpdateInterval(400); // 2.5 lecturas por segundo para no saturar la vista previa
       subscription = Accelerometer.addListener((data) => {
         const zAbs = Math.abs(data.z);
         const yAbs = Math.abs(data.y);
         const angleOk = (zAbs >= 0.18 && zAbs <= 0.92) || (yAbs >= 0.22 && yAbs <= 0.92);
-        setIsAngleOptimal(angleOk);
+        
+        // Solo actualizar estado React si cambió el valor para evitar re-renders de la cámara
+        if (angleOk !== isAngleOptimalRef.current) {
+          isAngleOptimalRef.current = angleOk;
+          setIsAngleOptimal(angleOk);
+        }
 
         const prev = prevSensorData.current;
         const deltaX = Math.abs(data.x - prev.x);
         const deltaY = Math.abs(data.y - prev.y);
         const deltaZ = Math.abs(data.z - prev.z);
         const speedOk = (deltaX + deltaY + deltaZ) < 0.35;
-        setIsSpeedOptimal(speedOk);
+
+        if (speedOk !== isSpeedOptimalRef.current) {
+          isSpeedOptimalRef.current = speedOk;
+          setIsSpeedOptimal(speedOk);
+        }
 
         prevSensorData.current = data;
 
         const now = Date.now();
         const isOptimal = angleOk && speedOk;
         try {
-          if (!isOptimal && (now - lastVibrationTime.current > 1500)) {
+          if (!isOptimal && (now - lastVibrationTime.current > 2000)) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
             lastVibrationTime.current = now;
           }
@@ -123,49 +136,63 @@ export default function CamaraGuiada({ onVideoSelected, onCancel }) {
     }
   };
 
-  const toggleRecording = async () => {
-    if (recording) {
-      try {
-        setRecording(false);
-        if (cameraRef.current) {
-          await cameraRef.current.stopRecording();
+  const iniciarGrabacion = async () => {
+    if (!cameraRef.current || isRecordingRef.current) return;
+    try {
+      isRecordingRef.current = true;
+      setRecording(true);
+
+      const video = await cameraRef.current.recordAsync({
+        maxDuration: 120,
+      });
+
+      isRecordingRef.current = false;
+      setRecording(false);
+
+      if (video && video.uri) {
+        const fileName = `video_camara_${Date.now()}.mp4`;
+        const permanentUri = FileSystem.documentDirectory + fileName;
+        try {
+          await FileSystem.copyAsync({ from: video.uri, to: permanentUri });
+          onVideoSelected({
+            uri: permanentUri,
+            name: fileName,
+            mimeType: 'video/mp4',
+          });
+        } catch (e) {
+          onVideoSelected({
+            uri: video.uri,
+            name: fileName,
+            mimeType: 'video/mp4',
+          });
         }
+      }
+    } catch (error) {
+      console.error("Error al grabar video:", error);
+      isRecordingRef.current = false;
+      setRecording(false);
+      Alert.alert("Error", "No se pudo realizar la grabación del video.");
+    }
+  };
+
+  const detenerGrabacion = async () => {
+    if (cameraRef.current && isRecordingRef.current) {
+      try {
+        await cameraRef.current.stopRecording();
       } catch (error) {
         console.error("Error al detener grabación:", error);
+      } finally {
+        isRecordingRef.current = false;
         setRecording(false);
       }
-    } else {
-      if (!cameraRef.current) return;
-      try {
-        setRecording(true);
-        const video = await cameraRef.current.recordAsync({
-          maxDuration: 120,
-        });
-        setRecording(false);
+    }
+  };
 
-        if (video && video.uri) {
-          const fileName = `video_camara_${Date.now()}.mp4`;
-          const permanentUri = FileSystem.documentDirectory + fileName;
-          try {
-            await FileSystem.copyAsync({ from: video.uri, to: permanentUri });
-            onVideoSelected({
-              uri: permanentUri,
-              name: fileName,
-              mimeType: 'video/mp4',
-            });
-          } catch (e) {
-            onVideoSelected({
-              uri: video.uri,
-              name: fileName,
-              mimeType: 'video/mp4',
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error al grabar video:", error);
-        Alert.alert("Error", "No se pudo realizar la grabación del video.");
-        setRecording(false);
-      }
+  const toggleRecording = () => {
+    if (isRecordingRef.current) {
+      detenerGrabacion();
+    } else {
+      iniciarGrabacion();
     }
   };
 
