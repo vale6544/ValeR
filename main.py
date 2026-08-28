@@ -101,81 +101,78 @@ def sembrar_datos_demo_si_esta_vacio():
                 cama.nombre = c_data["nombre"]
         db.commit()
 
-        # 2. Poblar 15 días continuos de registros y métricas para las 5 camas
+        # 2. Garantizar 15 días continuos de censo y cosechas para las 5 camas
         hoy = datetime.now()
         import random
         for cama_id in [1, 2, 3, 4, 5]:
-            count_cama = db.query(models.Registro).filter(models.Registro.cama_id == cama_id).count()
-            if count_cama < 14:
-                print(f"[INFO] Generando 15 días continuos para Cama ID {cama_id}...")
-                for d in range(14, -1, -1):
-                    fecha_dia = hoy - timedelta(days=d)
-                    dia_inicio = fecha_dia.replace(hour=0, minute=0, second=0, microsecond=0)
-                    dia_fin = fecha_dia.replace(hour=23, minute=59, second=59, microsecond=999999)
-                    existente = db.query(models.Registro).filter(
-                        models.Registro.cama_id == cama_id,
-                        models.Registro.fecha >= dia_inicio,
-                        models.Registro.fecha <= dia_fin
-                    ).first()
+            for d in range(14, -1, -1):
+                fecha_dia = hoy - timedelta(days=d)
+                dia_inicio = fecha_dia.replace(hour=0, minute=0, second=0, microsecond=0)
+                dia_fin = fecha_dia.replace(hour=23, minute=59, second=59, microsecond=999999)
+                existente = db.query(models.Registro).filter(
+                    models.Registro.cama_id == cama_id,
+                    models.Registro.fecha >= dia_inicio,
+                    models.Registro.fecha <= dia_fin
+                ).first()
 
-                    if not existente:
-                        cosecha = random.randint(12, 25)
-                        estrella = random.randint(15, 30)
-                        rayando = random.randint(18, 35)
-                        garbanzo = random.randint(22, 42)
-                        alberja = random.randint(24, 48)
-                        arroz = random.randint(20, 38)
-                        total_botones = cosecha + estrella + rayando + garbanzo + alberja + arroz
-                        total_tallos = total_botones + random.randint(2, 5)
+                if not existente:
+                    cosecha = random.randint(12, 25)
+                    estrella = random.randint(15, 30)
+                    rayando = random.randint(18, 35)
+                    garbanzo = random.randint(22, 42)
+                    alberja = random.randint(24, 48)
+                    arroz = random.randint(20, 38)
+                    total_botones = cosecha + estrella + rayando + garbanzo + alberja + arroz
+                    total_tallos = total_botones + random.randint(2, 5)
 
-                        nuevo_reg = models.Registro(
+                    nuevo_reg = models.Registro(
+                        cama_id=cama_id,
+                        fecha=fecha_dia,
+                        ruta_imagen="app/imagenes/demo_sample.jpg",
+                        observaciones=f"[Censo IA unificado - Lados A y B ({fecha_dia.strftime('%d/%m/%Y')})]",
+                        lado="C",
+                        segmento="Cama Completa"
+                    )
+                    db.add(nuevo_reg)
+                    db.commit()
+                    db.refresh(nuevo_reg)
+
+                    nueva_metrica = models.Metrica(
+                        registro_id=nuevo_reg.id,
+                        etapa_crecimiento="activo",
+                        tallos_cortos=0, tallos_medios=0, tallos_largos=0,
+                        total_tallos=total_tallos,
+                        score_confianza=round(random.uniform(0.89, 0.96), 2),
+                        boton_arroz=arroz,
+                        boton_alberja=alberja,
+                        boton_garbanzo=garbanzo,
+                        boton_rayando_color=rayando,
+                        boton_estrella=estrella,
+                        boton_cosecha=cosecha,
+                        etapa_dominante="garbanzo",
+                        total_botones=total_botones,
+                        tallo_largo_cosecha=cosecha,
+                        tallo_largo_estrella=estrella,
+                        tallo_largo_rayando=rayando,
+                        tallo_largo_garbanzo=garbanzo,
+                        tallo_largo_alberja=alberja,
+                        tallo_largo_arroz=arroz,
+                        fecha_analisis=fecha_dia
+                    )
+                    db.add(nueva_metrica)
+
+                    if d > 0 and d % 2 == 0:
+                        total_cosechado = cosecha + random.randint(-2, 2)
+                        nueva_poda = models.Poda(
                             cama_id=cama_id,
                             fecha=fecha_dia,
-                            ruta_imagen="app/imagenes/demo_sample.jpg",
-                            observaciones=f"[Censo IA unificado - Lados A y B ({fecha_dia.strftime('%d/%m/%Y')})]",
-                            lado="C",
-                            segmento="Cama Completa"
+                            tallos_largos=total_cosechado,
+                            tallos_medios=0,
+                            tallos_cortos=0,
+                            total_podados=total_cosechado,
+                            observaciones=f"Cosecha diaria confirmada ({fecha_dia.strftime('%d/%m/%Y')})"
                         )
-                        db.add(nuevo_reg)
-                        db.commit()
-                        db.refresh(nuevo_reg)
-
-                        nueva_metrica = models.Metrica(
-                            registro_id=nuevo_reg.id,
-                            etapa_crecimiento="activo",
-                            tallos_cortos=0, tallos_medios=0, tallos_largos=0,
-                            total_tallos=total_tallos,
-                            score_confianza=round(random.uniform(0.89, 0.96), 2),
-                            boton_arroz=arroz,
-                            boton_alberja=alberja,
-                            boton_garbanzo=garbanzo,
-                            boton_rayando_color=rayando,
-                            boton_estrella=estrella,
-                            boton_cosecha=cosecha,
-                            etapa_dominante="garbanzo",
-                            total_botones=total_botones,
-                            tallo_largo_cosecha=cosecha,
-                            tallo_largo_estrella=estrella,
-                            tallo_largo_rayando=rayando,
-                            tallo_largo_garbanzo=garbanzo,
-                            tallo_largo_alberja=alberja,
-                            tallo_largo_arroz=arroz,
-                            fecha_analisis=fecha_dia
-                        )
-                        db.add(nueva_metrica)
-
-                        if d > 0 and d % 2 == 0:
-                            total_cosechado = cosecha + random.randint(-2, 2)
-                            nueva_poda = models.Poda(
-                                cama_id=cama_id,
-                                fecha=fecha_dia,
-                                tallos_largos=total_cosechado,
-                                tallos_medios=0,
-                                tallos_cortos=0,
-                                total_podados=total_cosechado,
-                                observaciones=f"Cosecha diaria confirmada ({fecha_dia.strftime('%d/%m/%Y')})"
-                            )
-                            db.add(nueva_poda)
+                        db.add(nueva_poda)
 
             db.commit()
             print("[INFO] Datos históricos de prueba poblados exitosamente en la base de datos.")
