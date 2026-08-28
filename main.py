@@ -160,6 +160,7 @@ def sembrar_datos_demo_si_esta_vacio():
                         fecha_analisis=fecha_dia
                     )
                     db.add(nueva_metrica)
+                    db.commit()
 
                     if d > 0 and d % 2 == 0:
                         total_cosechado = cosecha + random.randint(-2, 2)
