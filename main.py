@@ -183,6 +183,14 @@ def sembrar_datos_demo_si_esta_vacio():
 
 sembrar_datos_demo_si_esta_vacio()
 
+@app.get("/configuracion/re-sembrar-demo")
+def re_sembrar_demo_endpoint(db: Session = Depends(get_db)):
+    try:
+        sembrar_datos_demo_si_esta_vacio()
+        return {"status": "ok", "mensaje": "Datos demo re-sembrados correctamente"}
+    except Exception as e:
+        return {"status": "error", "detalle": str(e)}
+
 CARPETA_FOTOGRAMAS = os.path.join(os.path.dirname(__file__), "app", "fotogramas_temp")
 
 CARPETA_IMAGENES = "app/imagenes"
