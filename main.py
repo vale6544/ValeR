@@ -101,12 +101,12 @@ def sembrar_datos_demo_si_esta_vacio():
                 cama.nombre = c_data["nombre"]
         db.commit()
 
-        # 2. Poblar 15 días continuos para las 5 camas si están vacías
+        # 2. Poblar 15 días continuos de registros y métricas para las 5 camas
         hoy = datetime.now()
         import random
         for cama_id in [1, 2, 3, 4, 5]:
             count_cama = db.query(models.Registro).filter(models.Registro.cama_id == cama_id).count()
-            if count_cama < 10:
+            if count_cama < 14:
                 print(f"[INFO] Generando 15 días continuos para Cama ID {cama_id}...")
                 for d in range(14, -1, -1):
                     fecha_dia = hoy - timedelta(days=d)
