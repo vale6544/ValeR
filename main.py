@@ -80,28 +80,34 @@ def sembrar_datos_demo_si_esta_vacio():
         from app.database import SessionLocal
         db = SessionLocal()
         
-        # 1. Asegurar las 5 camas de la florícola
+        # 1. Asegurar las 5 camas de la florícola de 30m x 1.2m
         camas_def = [
-            {"id": 1, "nombre": "Cama 100", "variedad": "Freedom", "filas_por_cama": 2},
-            {"id": 2, "nombre": "Cama 101", "variedad": "Explorer", "filas_por_cama": 2},
-            {"id": 3, "nombre": "Cama 102", "variedad": "Mondial", "filas_por_cama": 2},
-            {"id": 4, "nombre": "Cama 103", "variedad": "Vendela", "filas_por_cama": 2},
-            {"id": 5, "nombre": "Cama 104", "variedad": "Topaz", "filas_por_cama": 2},
+            {"id": 1, "nombre": "Cama 100", "variedad": "Freedom", "filas_por_cama": 2, "largo": 30.0, "ancho": 1.2, "responsable": "Operario 1", "descripcion": "Cama Bloque A"},
+            {"id": 2, "nombre": "Cama 101", "variedad": "Explorer", "filas_por_cama": 2, "largo": 30.0, "ancho": 1.2, "responsable": "Operario 1", "descripcion": "Cama Bloque A"},
+            {"id": 3, "nombre": "Cama 102", "variedad": "Mondial", "filas_por_cama": 2, "largo": 30.0, "ancho": 1.2, "responsable": "Operario 2", "descripcion": "Cama Bloque B"},
+            {"id": 4, "nombre": "Cama 103", "variedad": "Vendela", "filas_por_cama": 2, "largo": 30.0, "ancho": 1.2, "responsable": "Operario 2", "descripcion": "Cama Bloque B"},
+            {"id": 5, "nombre": "Cama 104", "variedad": "Topaz", "filas_por_cama": 2, "largo": 30.0, "ancho": 1.2, "responsable": "Operario 3", "descripcion": "Cama Bloque C"},
         ]
         for c_data in camas_def:
             cama = db.query(models.Cama).filter(models.Cama.id == c_data["id"]).first()
             if not cama:
                 cama = models.Cama(**c_data)
                 db.add(cama)
+            else:
+                cama.largo = c_data["largo"]
+                cama.ancho = c_data["ancho"]
+                cama.filas_por_cama = c_data["filas_por_cama"]
+                cama.variedad = c_data["variedad"]
+                cama.nombre = c_data["nombre"]
         db.commit()
 
-        # 2. Preservar Cama 100 intacta y poblar las demás camas si no tienen los 14 días
+        # 2. Poblar 15 días continuos para las 5 camas si están vacías
         hoy = datetime.now()
         import random
-        for cama_id in [2, 3, 4, 5]:
+        for cama_id in [1, 2, 3, 4, 5]:
             count_cama = db.query(models.Registro).filter(models.Registro.cama_id == cama_id).count()
-            if count_cama < 15:
-                print(f"[INFO] Generando 14 días continuos para Cama ID {cama_id}...")
+            if count_cama < 10:
+                print(f"[INFO] Generando 15 días continuos para Cama ID {cama_id}...")
                 for d in range(14, -1, -1):
                     fecha_dia = hoy - timedelta(days=d)
                     dia_inicio = fecha_dia.replace(hour=0, minute=0, second=0, microsecond=0)
